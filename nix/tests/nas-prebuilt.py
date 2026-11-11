@@ -6,6 +6,17 @@ datasets = {
 }
 
 
+def kubectl_items(args):
+    """The items of `k3s kubectl get ARGS -o json`. A read that doesn't parse is read again: one came back with bytes
+    missing in the middle on a loaded host"""
+    for _ in range(3):
+        try:
+            return json.loads(nas.succeed(f"k3s kubectl get {args} -o json"))["items"]
+        except json.JSONDecodeError as e:
+            error = e
+    raise error
+
+
 def check_pools():
     """Every dataset is unlocked and mounted where the NAS expects it"""
     for pool, children in datasets.items():
@@ -211,7 +222,7 @@ with subtest("apps: every workload rolls out with Ready pods, every HTTPRoute is
 
     def not_ready():
         """namespace/kind/name of each workload short of its desired Ready replicas"""
-        items = json.loads(nas.succeed("k3s kubectl get deploy,statefulset,daemonset -A -o json"))["items"]
+        items = kubectl_items("deploy,statefulset,daemonset -A")
         down = set()
         for item in items:
             spec, status = item["spec"], item.get("status", {})
@@ -236,7 +247,7 @@ with subtest("apps: every workload rolls out with Ready pods, every HTTPRoute is
             nas.execute(f"k3s kubectl -n {ns} logs {kind.lower()}/{name} --all-containers --tail=40 >&2")
             nas.execute(f"k3s kubectl -n {ns} logs {kind.lower()}/{name} --all-containers --previous --tail=40 >&2")
         raise AssertionError(f"down: {sorted(down - set(expected_down))}, up: {sorted(set(expected_down) - down)}")
-    routes = json.loads(nas.succeed("k3s kubectl get httproute -A -o json"))["items"]
+    routes = kubectl_items("httproute -A")
     assert routes, "no HTTPRoutes"
     for route in routes:
         ns, name = route["metadata"]["namespace"], route["metadata"]["name"]
@@ -269,7 +280,7 @@ with subtest("apps: every workload rolls out with Ready pods, every HTTPRoute is
 
     def jobs():
         """namespace/name of each Job to complete, failed or still going"""
-        items = json.loads(nas.succeed("k3s kubectl get jobs -A -o json"))["items"]
+        items = kubectl_items("jobs -A")
         state = {}
         for job in items:
             conditions = {c["type"]: c["status"] for c in job.get("status", {}).get("conditions", [])}
