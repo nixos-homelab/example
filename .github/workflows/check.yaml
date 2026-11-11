@@ -1,6 +1,6 @@
 name: Check
 
-# The checks of the flake: the manifests the NAS sends to k3s, validated without a cluster
+# The checks of the flake: the manifests the NAS sends to k3s, and the NAS in a VM under the NixOS test driver
 on:
   push:
     branches: [main]
@@ -13,11 +13,23 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+    # The VM closure and its images take more than the runner has free
+    - name: Free disk space
+      run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache /usr/local/share/boost
+    # The mode systemd gives /dev/kvm upstream. A group won't do: Nix drops the supplementary groups of sandboxed
+    # builds
+    - name: Enable KVM
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
     - name: Checkout
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: Install Nix
       uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
       with:
-        extra_nix_config: experimental-features = nix-command flakes
+        extra_nix_config: |
+          experimental-features = nix-command flakes
+          system-features = kvm nixos-test benchmark big-parallel
     - name: Check the flake
       run: nix flake check -L

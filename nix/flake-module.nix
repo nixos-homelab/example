@@ -60,6 +60,11 @@ in
               exec ${lib.getExe pkgs.nix-diff} result \
                 "$(nix build --no-link --print-out-paths .#nixosConfigurations.nas.config.system.build.toplevel)"'';
           }
+          {
+            help = "Run test scripts against the prebuilt VM under the NixOS test driver";
+            name = "vm-test";
+            command = ''PATH=${lib.makeBinPath [ pkgs.jq ]}:$PATH exec ${./tests}/vm-test "$@"'';
+          }
         ];
         packages = {
           nas-prebuilt = inputs.qemu-vm.lib.mkVMRunner {
@@ -78,6 +83,18 @@ in
         checks.manifests = inputs.homelab-shared.lib.checks.manifests {
           inherit pkgs;
           inherit (configs.nas) config;
+        };
+        # The NAS in the prebuilt VM under the NixOS test driver, with a LAN client and one outside it
+        checks.nas-prebuilt = pkgs.testers.runNixOSTest {
+          name = "nas-prebuilt";
+          # The configuration sets nixpkgs.config, so it brings its own pkgs
+          node.pkgs = lib.mkForce null;
+          nodes.nas.imports = self.lib.importsApply [ ./hosts/nas/vm-prebuilt.nix ] ++ [
+            # unifi's mongodb is unfree, so cache.nixos.org doesn't have it and it takes hours to build
+            { homelab.unifi.enable = lib.mkForce false; }
+          ];
+          testScript = builtins.readFile ./tests/prelude.py + builtins.readFile ./tests/nas-prebuilt.py;
+          imports = [ ./tests/nas-prebuilt.nix ];
         };
       };
   };

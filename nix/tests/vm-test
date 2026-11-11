@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2154
+set -eo pipefail; shopt -s inherit_errexit
+
+DOC="Run scripts against a host's prebuilt VM under the NixOS test driver
+Usage:
+  vm-test run [-i INPUT]... HOST [SCRIPT]
+  vm-test start [-i INPUT]... HOST
+  vm-test exec HOST [SCRIPT]
+  vm-test stop HOST
+
+run: Boot, run SCRIPT (default: nix/tests/HOST-prebuilt.py), shut down.
+start: Boot and keep the machines running for exec, until stop.
+exec: Run SCRIPT (default: stdin) in the running driver and print its log.
+State and logs go in ~/.cache/vm-test/<checkout>-HOST/.
+
+Options:
+  -i, --input INPUT  Build with a local checkout for a flake input, as
+                     NAME=PATH (tracked files, uncommitted changes included)
+"
+# docopt parser below, refresh this parser with `docopt.sh vm-test`
+# shellcheck disable=2016,2086,2329,1075,2154
+docopt() { parse() { if ${DOCOPT_DOC_CHECK:-true}; then local doc_hash;if \
+doc_hash=$(printf "%s" "$DOC" | (sha256sum 2>/dev/null || shasum -a 256)); then
+if [[ ${doc_hash:0:5} != "$digest" ]]; then stderr "The current usage doc \
+(${doc_hash:0:5}) does not match what the parser was generated with (${digest})
+Run \`docopt.sh\` to refresh the parser.";_return 70;fi;fi;fi;local root_idx=$1
+shift;params=();testdepth=0;local argv=("$@") arg i o;while [[ ${#argv[@]} -gt \
+0 ]]; do if [[ ${argv[0]} = "--" ]]; then for arg in "${argv[@]}"; do
+params+=("a:$arg");done;break;elif [[ ${argv[0]} = --* ]]; then local \
+long=${argv[0]%%=*};if ${DOCOPT_ADD_HELP:-true} && [[ $long = "--help" ]]; then
+stdout "$trimmed_doc";_return 0;elif [[ ${DOCOPT_PROGRAM_VERSION:-false} != 'f'\
+'alse' && $long = "--version" ]]; then stdout "$DOCOPT_PROGRAM_VERSION"
+_return 0;fi;local similar=() match=false;i=0;for o in "${options[@]}"; do if \
+[[ $o = *" $long "? ]]; then similar+=("$long");match=$i;break;fi;: $((i++))
+done;if [[ $match = false ]]; then i=0;for o in "${options[@]}"; do if [[ $o = \
+*" $long"*? ]]; then local long_match=${o#* };similar+=("${long_match% *}")
+match=$i;fi;: $((i++));done;fi;if [[ ${#similar[@]} -gt 1 ]]; then error \
+"${long} is not a unique prefix: ${similar[*]}?";elif [[ ${#similar[@]} -lt 1 \
+]]; then error;else if [[ ${options[$match]} = *0 ]]; then if [[ ${argv[0]} = \
+*=* ]]; then local long_match=${o#* };error "${long_match% *} must not have an \
+argument";else params+=("$match:true");argv=("${argv[@]:1}");fi;else if [[ \
+${argv[0]} = *=* ]]; then params+=("$match:${argv[0]#*=}");argv=("${argv[@]:1}")
+else if [[ ${#argv[@]} -le 1 || ${argv[1]} = '--' ]]; then error "${long} \
+requires argument";fi;params+=("$match:${argv[1]}");argv=("${argv[@]:2}");fi;fi
+fi;elif [[ ${argv[0]} = -* && ${argv[0]} != "-" ]]; then local \
+remaining=${argv[0]#-};while [[ -n $remaining ]]; do local \
+short="-${remaining:0:1}";if ${DOCOPT_ADD_HELP:-true} && [[ $short = "-h" ]]; \
+then stdout "$trimmed_doc";_return 0;fi;local matched=false
+remaining="${remaining:1}";i=0;for o in "${options[@]}"; do if [[ $o = "$short \
+"* ]]; then if [[ $o = *1 ]]; then if [[ $remaining = '' ]]; then if [[ \
+${#argv[@]} -le 1 || ${argv[1]} = '--' ]]; then error "${short} requires \
+argument";fi;params+=("$i:${argv[1]}");argv=("${argv[@]:1}");break 2;else
+params+=("$i:$remaining");break 2;fi;else params+=("$i:true");matched=true;break
+fi;fi;: $((i++));done;$matched || error;done;argv=("${argv[@]:1}");elif \
+${DOCOPT_OPTIONS_FIRST:-false}; then for arg in "${argv[@]}"; do
+params+=("a:$arg");done;break;else params+=("a:${argv[0]}")
+argv=("${argv[@]:1}");fi;done;if ! "node_$root_idx" || [ ${#params[@]} -gt 0 \
+]; then error;fi;return 0;};sequence() { local initial_params=("${params[@]}") \
+node_idx;: $((testdepth++));for node_idx in "$@"; do if ! "node_$node_idx"; then
+params=("${initial_params[@]}");: $((testdepth--));return 1;fi;done;if [[ \
+$((--testdepth)) -eq 0 ]]; then params=("${initial_params[@]}");for node_idx \
+in "$@"; do "node_$node_idx";done;fi;return 0;};choice() { local \
+initial_params=("${params[@]}") best_match_idx unmatched_count node_idx;: \
+$((testdepth++));for node_idx in "$@"; do if "node_$node_idx"; then if [[ -z \
+$unmatched_count || ${#params[@]} -lt $unmatched_count ]]; then
+best_match_idx=$node_idx;unmatched_count=${#params[@]};fi;fi
+params=("${initial_params[@]}");done;: $((testdepth--));if [[ -n \
+$best_match_idx ]]; then "node_$best_match_idx";return 0;fi;return 1;}
+optional() { local node_idx;for node_idx in "$@"; do "node_$node_idx";done
+return 0;};repeatable() { local matched=false remaining=${#params[@]};while \
+"node_$1"; do matched=true;[[ $remaining -eq ${#params[@]} ]] && break
+remaining=${#params[@]};done;if $matched; then return 0;fi;return 1;};switch() {
+local i param;for i in "${!params[@]}"; do local param=${params[$i]};if [[ \
+$param = "$2" || $param = "$2":* ]]; then params=("${params[@]:0:$i}" \
+"${params[@]:((i+1))}");[[ $testdepth -gt 0 ]] && return 0;if [[ $3 = true ]]; \
+then eval "((var_$1++))" || true;else eval "var_$1=true";fi;return 0;elif [[ \
+$param = a:* && $2 = a:* ]]; then return 1;fi;done;return 1;};value() { local \
+i param;for i in "${!params[@]}"; do local param=${params[$i]};if [[ $param = \
+"$2":* ]]; then params=("${params[@]:0:$i}" "${params[@]:((i+1))}");[[ \
+$testdepth -gt 0 ]] && return 0;if [[ $3 = true ]]; then eval \
+"var_$1+="'("${param#*:}")';else eval "var_$1="'${param#*:}';fi;return 0;fi;done
+return 1;};stdout() { printf -- "cat <<'EOM'\n%s\nEOM\n" "$1";};stderr() {
+printf -- "cat <<'EOM' >&2\n%s\nEOM\n" "$1";};error() { [[ -n $1 ]] && stderr \
+"$1";stderr "$usage";_return 1;};_return() { printf -- "exit %d\n" "$1";exit \
+"$1";};set -e;trimmed_doc=${DOC:0:627};usage=${DOC:69:132};digest=16c80
+options=('-i --input 1');node_0(){ value __input 0 true;};node_1(){ value HOST a
+};node_2(){ value SCRIPT a;};node_3(){ switch run a:run;};node_4(){ switch \
+start a:start;};node_5(){ switch exec a:exec;};node_6(){ switch stop a:stop;}
+node_7(){ sequence 3 8 1 10;};node_8(){ repeatable 9;};node_9(){ optional 0;}
+node_10(){ optional 2;};node_11(){ sequence 4 8 1;};node_12(){ sequence 5 1 10;}
+node_13(){ sequence 6 1;};node_14(){ choice 7 11 12 13;};cat <<<' \
+docopt_exit() { [[ -n $1 ]] && printf "%s\n" "$1" >&2;printf "%s\n" \
+"${DOC:69:132}" >&2;exit 1;}';local varnames=(__input HOST SCRIPT run start \
+exec stop) varname;for varname in "${varnames[@]}"; do unset "var_$varname";done
+parse 14 "$@";local p=${DOCOPT_PREFIX:-''};for varname in "${varnames[@]}"; do
+unset "$p$varname";done;if declare -p var___input >/dev/null 2>&1; then eval \
+$p'__input=("${var___input[@]}")';else eval $p'__input=()';fi;eval $p'HOST=${v'\
+'ar_HOST:-};'$p'SCRIPT=${var_SCRIPT:-};'$p'run=${var_run:-false};'$p'start=${v'\
+'ar_start:-false};'$p'exec=${var_exec:-false};'$p'stop=${var_stop:-false};'
+local docopt_i=1;[[ $BASH_VERSION =~ ^4.3 ]] && docopt_i=2;for \
+((;docopt_i>0;docopt_i--)); do for varname in "${varnames[@]}"; do declare -p \
+"$p$varname";done;done;}
+# docopt parser above, complete command for generating this parser is `docopt.sh vm-test`
+
+main() {
+  eval "$(docopt "$@")"
+  # Outside the checkout: below a worktree the VM's swtpm socket path passes the 108-byte limit
+  local dir tests
+  dir=${XDG_CACHE_HOME:-$HOME/.cache}/vm-test/$(realpath . | sha256sum | cut -c1-8)-$HOST
+  tests=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
+  running() { [[ -f $dir/pid ]] && kill -0 "$(<"$dir/pid")" 2>/dev/null; }
+  if $run || $start; then
+    ! running || { printf "A driver for %s is already running (vm-test stop %s)\n" "$HOST" "$HOST" >&2; return 1; }
+    local system check driver conf input overrides=()
+    for input in "${__input[@]}"; do
+      overrides+=(--override-input "${input%%=*}" "git+file://$(realpath "${input#*=}")")
+    done
+    system=$(nix eval --raw --impure --expr builtins.currentSystem)
+    check=".#checks.$system.$HOST-prebuilt"
+    driver=$(nix build --no-link --print-out-paths "${overrides[@]}" "$check.driver")
+    conf=$(nix build --no-link --print-out-paths "${overrides[@]}" "$check.config.driverConfigurationFile")
+    mkdir -p "$dir"
+    # The driver keeps its machines' state and sockets under XDG_RUNTIME_DIR
+    export XDG_RUNTIME_DIR=$dir PYTHONUNBUFFERED=1
+    jq --arg s "$dir/test-script.py" '.test_script = $s' "$conf" >"$dir/config.json"
+  fi
+  if $run; then
+    cat "$tests/prelude.py" "${SCRIPT:-nix/tests/$HOST-prebuilt.py}" >"$dir/test-script.py"
+    printf "%d\n" $$ >"$dir/pid"
+    exec "$driver/bin/nixos-test-driver" --config "$dir/config.json" -o "$dir"
+  elif $start; then
+    rm -f "$dir/in" "$dir/out"
+    mkfifo "$dir/in" "$dir/out"
+    cat "$tests/prelude.py" "$tests/serve.py" >"$dir/test-script.py"
+    VM_TEST_DIR=$dir VM_TEST_HOST=$HOST setsid "$driver/bin/nixos-test-driver" --config "$dir/config.json" -o "$dir" >"$dir/driver.log" 2>&1 &
+    printf "%d\n" $! >"$dir/pid"
+    await_status >/dev/null || { tail -20 "$dir/driver.log" >&2; return 1; }
+    printf "%s started, log: %s\n" "$HOST" "$dir/driver.log"
+  elif $exec; then
+    running || { printf "No driver for %s is running (vm-test start %s)\n" "$HOST" "$HOST" >&2; return 1; }
+    local offset status code
+    code=$(cat "${SCRIPT:--}")
+    offset=$(stat -c %s "$dir/driver.log")
+    timeout 10 tee "$dir/in" <<<"$code" >/dev/null
+    status=$(await_status) || true
+    tail -c +$((offset + 1)) "$dir/driver.log"
+    [[ $status = ok ]]
+  elif $stop; then
+    if running; then
+      timeout 10 tee "$dir/in" <<<"raise SystemExit" >/dev/null || true
+      timeout 30 tail --pid "$(<"$dir/pid")" -f /dev/null || kill "$(<"$dir/pid")"
+    fi
+    rm -f "$dir/in" "$dir/out" "$dir/pid"
+  fi
+}
+
+# Print what the driver writes to the out FIFO, fail if the driver exits first
+await_status() {
+  cat "$dir/out" & local reader=$!
+  while kill -0 $reader 2>/dev/null; do
+    running || { kill $reader; return 1; }
+    sleep 1
+  done
+  wait $reader
+}
+
+main "$@"
