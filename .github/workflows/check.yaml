@@ -25,11 +25,41 @@ jobs:
         sudo udevadm trigger --name-match=kvm
     - name: Checkout
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    # What earlier runs built, as a binary cache in a directory. A branch reads the caches of main too, so the runs on
+    # main keep it current
+    - name: Restore the Nix cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: /home/runner/nix-cache
+        key: nix-${{ hashFiles('flake.lock') }}-${{ github.sha }}
+        restore-keys: |
+          nix-${{ hashFiles('flake.lock') }}-
+          nix-
+    # Unsigned: a runner has no key to sign with, and only the workflows of this repository write its cache
     - name: Install Nix
       uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
       with:
         extra_nix_config: |
           experimental-features = nix-command flakes
           system-features = kvm nixos-test benchmark big-parallel
+          extra-substituters = file:///home/runner/nix-cache?trusted=true
     - name: Check the flake
       run: nix flake check -L
+    # Everything not from cache.nixos.org, without the upstream image archives (fetched again from their registries)
+    # and the disk image of the VM, which would take most of the 10 GB GitHub keeps per repository
+    - name: Fill the Nix cache
+      if: ${{ !cancelled() }}
+      run: |
+        rm -rf /home/runner/nix-cache
+        nix path-info --all --json |
+          jq -r 'if type == "array" then .[] | [.path, .signatures] else to_entries[] | [.key, .value.signatures] end
+            | select(any(.[1][]?; startswith("cache.nixos.org-")) | not) | .[0]' |
+          grep -vE '\.drv$|-docker-image-.*\.tar$|-nixos-disk-image' |
+          xargs -r nix copy --to 'file:///home/runner/nix-cache?compression=zstd'
+        du -sh /home/runner/nix-cache
+    - name: Save the Nix cache
+      if: ${{ !cancelled() }}
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: /home/runner/nix-cache
+        key: nix-${{ hashFiles('flake.lock') }}-${{ github.sha }}
