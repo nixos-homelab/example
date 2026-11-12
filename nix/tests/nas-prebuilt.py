@@ -194,7 +194,15 @@ with subtest("apps: postgresql has generated passwords from Secrets, the apps us
     nas.fail(login("postgres", "echo postgres"))
     # The apps log in with their copy of the password
     for user in users:
-        nas.wait_until_succeeds(f"k3s kubectl -n {user} rollout status deploy/{user} --timeout=10s", timeout=900)
+        try:
+            nas.wait_until_succeeds(f"k3s kubectl -n {user} rollout status deploy/{user} --timeout=10s", timeout=900)
+        except Exception:
+            nas.execute(
+                f"k3s kubectl -n {user} describe pods | tail -40 >&2;"
+                f" k3s kubectl -n {user} logs deploy/{user} --all-containers --previous --tail=60 >&2;"
+                f" k3s kubectl -n {user} logs deploy/{user} --all-containers --tail=60 >&2"
+            )
+            raise
     nas.succeed(f"{pg} create job backup-test --from=cronjob/backup-grafana-db")
     nas.wait_until_succeeds(f"{pg} wait job/backup-test --for=condition=Complete --timeout=10s", timeout=300)
 
