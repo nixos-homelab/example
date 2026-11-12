@@ -3,7 +3,9 @@ updates:
 - package-ecosystem: nix
   directory: /
   schedule:
-    interval: weekly
+    interval: cron
+    # Twice a week, so the Nix cache in the Actions cache never goes 7 days without a restore
+    cronjob: "0 4 * * 1,4"
 - package-ecosystem: github-actions
   directory: /
   schedule:
