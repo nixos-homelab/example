@@ -47,10 +47,12 @@ jobs:
       run: nix flake check -L
     # Everything not from cache.nixos.org, without the upstream image archives (fetched again from their registries)
     # and the disk image of the VM, which would take most of the 10 GB GitHub keeps per repository
+    # The Nix daemon, which runs as root, makes the directory when it opens the substituter
     - name: Fill the Nix cache
+      id: fill
       if: ${{ !cancelled() }}
       run: |
-        rm -rf /home/runner/nix-cache
+        sudo rm -rf /home/runner/nix-cache
         nix path-info --all --json |
           jq -r 'if type == "array" then .[] | [.path, .signatures] else to_entries[] | [.key, .value.signatures] end
             | select(any(.[1][]?; startswith("cache.nixos.org-")) | not) | .[0]' |
@@ -58,7 +60,7 @@ jobs:
           xargs -r nix copy --to 'file:///home/runner/nix-cache?compression=zstd'
         du -sh /home/runner/nix-cache
     - name: Save the Nix cache
-      if: ${{ !cancelled() }}
+      if: ${{ !cancelled() && steps.fill.outcome == 'success' }}
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: /home/runner/nix-cache
