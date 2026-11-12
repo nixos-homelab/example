@@ -8,6 +8,8 @@ in
 {
   # The host firewall's LAN is the test VLAN's lower half: lan and the nas get .1 and .2, outside sits above it
   nodes.nas.homelab.cilium.cidr-groups.localLANCIDR4 = lib.mkForce "192.168.1.0/25";
+  # The CPUs of a public runner. More vCPUs than the host has stall the guest under nested KVM
+  nodes.nas.virtualisation.cores = lib.mkForce 4;
   nodes.lan = lib.mkMerge [
     client
     # For the pods allowed to reach the LAN
