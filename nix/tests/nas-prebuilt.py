@@ -316,6 +316,25 @@ with subtest("apps: every workload rolls out with Ready pods, every HTTPRoute is
         )
     assert not failed, f"Jobs that didn't complete: {sorted(failed)}"
 
+with subtest("k3s: the metrics API answers, and metrics-server takes pods with its egress label"):
+    nas.wait_until_succeeds("k3s kubectl top node", timeout=300)
+    # The apiserver comes from the host, which Cilium lets in regardless; pods get through only when the netpols select
+    # the release's pods
+    ms = nas.succeed(
+        "k3s kubectl -n kube-system get pod -l k8s-app=metrics-server -o jsonpath='{.items[0].status.podIP}'"
+    ).strip()
+    image = nas.succeed(
+        "k3s kubectl -n client-vpn get deploy admins-vpn -o jsonpath='{.spec.template.spec.containers[0].image}'"
+    ).strip()
+    nas.succeed(
+        f"k3s kubectl -n default run metrics-probe --image={image} --image-pull-policy=Never"
+        " --labels=cluster.local/metrics-server-egress=allow --command -- sleep 600"
+    )
+    nas.wait_until_succeeds("k3s kubectl -n default wait pod/metrics-probe --for=condition=Ready --timeout=10s", timeout=120)
+    nas.wait_until_succeeds(
+        f"k3s kubectl -n default exec metrics-probe -- timeout 3 bash -c 'exec 3<>/dev/tcp/{ms}/10250'", timeout=60
+    )
+
 with subtest("shutdown: a reboot drains the node first, leaving no Failed pods and no cordon"):
     nas.wait_until_succeeds("k3s kubectl -n cilium rollout status deploy/cilium-operator --timeout=10s", timeout=300)
     # Through logind, which sends PrepareForShutdown; the driver's reboot() presses Ctrl+Alt+Del, which doesn't
