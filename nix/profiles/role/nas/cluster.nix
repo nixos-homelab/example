@@ -31,27 +31,25 @@ in
           acme-production-issuer = { inherit webhook-config; };
         };
     };
-    kubetree = {
-      workload-macros.acmeProvider = "letsencrypt-production";
-      resources.external-dns.deployment.spec.podSpecMacro.containersByName.external-dns-libdns-webhook.envByName =
-        {
-          LIBDNS_PROVIDER_NAME = "inwx";
-          INWX_USERNAME.valueFrom.secretKeyRef = {
-            name = "inwx-credentials";
-            key = "INWX_USERNAME";
-          };
-          INWX_PASSWORD.valueFrom.secretKeyRef = {
-            name = "inwx-credentials";
-            key = "INWX_PASSWORD";
-          };
-          LIBDNS_PROVIDER_CONFIG = ''
-            {
-              "Username": "$(INWX_USERNAME)",
-              "Password": "$(INWX_PASSWORD)"
-            }
-          '';
+    homelab.workloads.acmeProvider = "letsencrypt-production";
+    homelab.kubernetes.submodules.instances.external-dns.config.kubernetes.resources.deployments.external-dns.spec.template.spec.containers.external-dns-libdns-webhook.env =
+      {
+        LIBDNS_PROVIDER_NAME.value = "inwx";
+        INWX_USERNAME.valueFrom.secretKeyRef = {
+          name = "inwx-credentials";
+          key = "INWX_USERNAME";
         };
-    };
+        INWX_PASSWORD.valueFrom.secretKeyRef = {
+          name = "inwx-credentials";
+          key = "INWX_PASSWORD";
+        };
+        LIBDNS_PROVIDER_CONFIG.value = ''
+          {
+            "Username": "$(INWX_USERNAME)",
+            "Password": "$(INWX_PASSWORD)"
+          }
+        '';
+      };
     # The INWX credentials, asked for once and stored in the cluster for both
     setup-secrets = {
       sources.INWX_USERNAME = {

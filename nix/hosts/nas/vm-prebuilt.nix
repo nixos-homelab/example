@@ -74,7 +74,7 @@ in
   config = {
     networking.hostName = "nas-prebuilt";
     networking.domain = "prebuilt.example.org";
-    homelab.cluster.domain = "prebuilt.example.org";
+    homelab.workloads.domain = "prebuilt.example.org";
     # Measured with setup-secrets done and every workload up: 6.1 GiB used, 1.7 GiB available
     virtualisation.memorySize = 8 * 1024;
     # The ARC grows into nearly all of the VM's memory by default, which the host then has to back

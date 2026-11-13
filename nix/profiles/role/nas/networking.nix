@@ -5,7 +5,7 @@
 }:
 let
   prefix = config.nas.ipv6Prefix;
-  domain = config.homelab.cluster.domain;
+  domain = config.homelab.workloads.domain;
   # All-zero WireGuard keys stand in for real ones
   noKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 in
@@ -20,33 +20,23 @@ in
     inputs.homelab-networking.nixosModules.routed-ippool
   ];
   config = {
-    kubetree = {
-      cilium.enable = true;
-      workload-macros.gatewayClassName = "cilium";
-      # Plex reachable from the internet, through the router at the address of the home network
-      resources.plex.plex-external-record = {
-        apiVersion = "externaldns.k8s.io/v1alpha1";
-        kind = "DNSEndpoint";
-        metadata = {
-          namespace = "plex";
-          name = "plex-external";
-        };
-        spec.endpoints = [
-          {
-            dnsName = "plex-external.${domain}";
-            recordTTL = 300;
-            recordType = "A";
-            targets = [ "203.0.113.10" ];
-          }
-          {
-            dnsName = "plex-external.${domain}";
-            recordTTL = 300;
-            recordType = "AAAA";
-            targets = [ "${prefix}:0:44:0:14" ];
-          }
-        ];
-      };
-    };
+    homelab.workloads.gatewayClassName = "cilium";
+    # Plex reachable from the internet, through the router at the address of the home network
+    homelab.kubernetes.submodules.instances.plex.config.kubernetes.resources.dNSEndpoints.plex-external.spec.endpoints =
+      [
+        {
+          dnsName = "plex-external.${domain}";
+          recordTTL = 300;
+          recordType = "A";
+          targets = [ "203.0.113.10" ];
+        }
+        {
+          dnsName = "plex-external.${domain}";
+          recordTTL = 300;
+          recordType = "AAAA";
+          targets = [ "${prefix}:0:44:0:14" ];
+        }
+      ];
     homelab = {
       cluster = {
         enableIPv4 = true;

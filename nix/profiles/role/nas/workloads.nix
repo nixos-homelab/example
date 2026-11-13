@@ -6,7 +6,7 @@
 let
   # The pods mount the media library and the download directories from the NAS itself
   nfs = path: {
-    server = "${config.networking.hostName}.${config.homelab.cluster.domain}";
+    server = "${config.networking.hostName}.${config.homelab.workloads.domain}";
     inherit path;
   };
 in

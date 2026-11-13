@@ -22,7 +22,7 @@ in
       };
       groups.cluster.gid = cluster;
     };
-    kubetree.workload-macros.securityContext = {
+    homelab.workloads.securityContext = {
       runAsUser = cluster;
       runAsGroup = cluster;
       supplementalGroups = [ users ];

@@ -9,6 +9,6 @@
   config = {
     networking.hostName = "nas-vm-install";
     networking.domain = "installable.example.org";
-    homelab.cluster.domain = "installable.example.org";
+    homelab.workloads.domain = "installable.example.org";
   };
 }

@@ -20,7 +20,7 @@
   config = {
     networking.hostName = "nas";
     networking.domain = "example.org";
-    homelab.cluster.domain = "example.org";
+    homelab.workloads.domain = "example.org";
     boot.kernelParams = [ "consoleblank=60" ];
     boot.kernelModules = [ "kvm-amd" ];
     environment.systemPackages = [ pkgs.smartmontools ];
