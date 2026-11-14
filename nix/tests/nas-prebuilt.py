@@ -113,13 +113,13 @@ with subtest("networking: cluster-wide policies: one object per name, pod-to-loc
     lan.succeed("(nc -lk 8000 >/dev/null 2>&1 &)")
     lan_ip = lan.succeed("ip -4 -o addr show eth1 | awk '{print $4}' | cut -d/ -f1").strip()
     # A pod with local-lan-egress and nothing else (client-vpn's own policy allows the world), in client-vpn's image
-    # for its bash
+    # for its bash, which as PID 1 ends on SIGTERM only with a trap: the reboot drains the node and waits for it
     image = nas.succeed(
         "k3s kubectl -n client-vpn get deploy admins-vpn -o jsonpath='{.spec.template.spec.containers[0].image}'"
     ).strip()
     nas.succeed(
         f"k3s kubectl -n default run lan-probe --image={image} --image-pull-policy=Never"
-        " --labels=cluster.local/local-lan-egress=allow --command -- sleep 600"
+        " --labels=cluster.local/local-lan-egress=allow --command -- bash -c 'trap exit TERM; sleep 600 & wait'"
     )
     nas.wait_until_succeeds("k3s kubectl -n default wait pod/lan-probe --for=condition=Ready --timeout=10s", timeout=120)
     nas.wait_until_succeeds(
@@ -335,7 +335,7 @@ with subtest("k3s: its bundled metrics-server answers the metrics API and takes 
     ).strip()
     nas.succeed(
         f"k3s kubectl -n default run metrics-probe --image={image} --image-pull-policy=Never"
-        " --labels=cluster.local/metrics-server-egress=allow --command -- sleep 600"
+        " --labels=cluster.local/metrics-server-egress=allow --command -- bash -c 'trap exit TERM; sleep 600 & wait'"
     )
     nas.wait_until_succeeds("k3s kubectl -n default wait pod/metrics-probe --for=condition=Ready --timeout=10s", timeout=120)
     nas.wait_until_succeeds(
