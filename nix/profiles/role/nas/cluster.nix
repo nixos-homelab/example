@@ -10,14 +10,14 @@ in
   # A single-node k3s cluster with step-ca for the users of the cluster, Let's Encrypt certificates and DNS records from external-dns,
   # both through the DNS provider INWX
   imports = [
-    inputs.homelab-shared.nixosModules.cluster
+    inputs.homelab-shared.nixosModules.k3s
     inputs.homelab-shared.nixosModules.k8sss
     inputs.homelab-shared.nixosModules.cert-manager
     inputs.homelab-networking.nixosModules.external-dns
   ];
   config = {
     homelab = {
-      cluster.enable = true;
+      k3s.enable = true;
       k8sss.enable = true;
       cert-manager =
         let

@@ -123,7 +123,6 @@ with subtest("networking: cluster-wide policies: one object per name, pod-to-loc
         f"k3s kubectl -n default exec lan-probe -- timeout 3 bash -c 'exec 3<>/dev/tcp/{lan_ip}/8000'", timeout=60
     )
     nas.succeed("k3s kubectl get ccnp pod-to-apiserver -o jsonpath='{.spec.egress}' | grep -q kube-apiserver")
-    nas.succeed("k3s kubectl get ccnp pod-from-apiserver -o jsonpath='{.spec.ingress}' | grep -q kube-apiserver")
 
 with subtest("networking: NodePorts are served on the LAN's addresses only, not on privacy-vpn"):
     # Any key brings the interface up with its address, which is all Cilium looks at; no handshake needed

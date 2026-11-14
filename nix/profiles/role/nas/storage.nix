@@ -28,7 +28,7 @@ in
       supplementalGroups = [ users ];
     };
     homelab = {
-      cluster.dataDir = "/mnt/cluster/k3s";
+      k3s.dataDir = "/mnt/cluster/k3s";
       nfs-provisioner = {
         enable = true;
         path = "/mnt/cluster/data";
@@ -39,7 +39,7 @@ in
       };
     };
     # Without the pool mounted (a key that didn't load) k3s would start a new cluster on the root filesystem
-    systemd.services.k3s.unitConfig.AssertPathIsMountPoint = config.homelab.cluster.dataDir;
+    systemd.services.k3s.unitConfig.AssertPathIsMountPoint = config.homelab.k3s.dataDir;
     services.nfs.server = {
       enable = true;
       # The NAS mounts the exports itself, through an FQDN that /etc/hosts maps to 127.0.0.2
