@@ -28,6 +28,9 @@ def check_pools():
 
 
 boot_prebuilt(nas)
+# The clients boot while k3s comes up; the first to use them is the firewall subtest
+lan.start()
+outside.start()
 
 with subtest("storage: the pools are made at the first Secure Boot, keys sealed in the credstore, before k3s starts"):
     check_pools()
