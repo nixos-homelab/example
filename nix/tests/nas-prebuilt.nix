@@ -14,6 +14,19 @@ in
   nodes.nas.virtualisation.qemu.options = [
     "-smp $(n=$(${hostPkgs.coreutils}/bin/nproc); echo $((n < 8 ? n : 8)))"
   ];
+  # The disks of the pools last only as long as the test, so QEMU skips the flushes of ZFS and containerd
+  nodes.nas.imports = [
+    (
+      { config, ... }:
+      {
+        virtualisation.qemu.options = lib.concatLists (
+          lib.imap1 (
+            idx: drive: lib.optional (lib.hasInfix "/empty" drive.file) "-set drive.drive${toString idx}.cache=unsafe"
+          ) config.virtualisation.qemu.drives
+        );
+      }
+    )
+  ];
   # Manifests that a later generation no longer has, which the k3s subtests link into k3s' manifests directory. The
   # first also declares an object of a manifest k3s bundles, as one that moved to a remaining manifest
   nodes.nas.environment.etc."k3s-prune-test/prune-test.yaml".text = ''
