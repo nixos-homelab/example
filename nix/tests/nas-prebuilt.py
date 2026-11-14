@@ -339,6 +339,31 @@ with subtest("k3s: its bundled metrics-server answers the metrics API and takes 
         f"k3s kubectl -n default exec metrics-probe -- timeout 3 bash -c 'exec 3<>/dev/tcp/{ms}/10250'", timeout=60
     )
 
+with subtest("k3s: a deploy removes the manifests it no longer has, with their Addons and objects, none of k3s' own"):
+    manifests = "/mnt/cluster/k3s/server/manifests"
+    addons = "k3s kubectl -n kube-system get addon -o jsonpath='{.items[*].metadata.name}'"
+    before = set(nas.succeed(addons).split())
+    nas.succeed(f"ln -s $(readlink -f /etc/k3s-prune-test/prune-test.yaml) {manifests}/prune-test.yaml")
+    configmap = "k3s kubectl -n default get configmap prune-test"
+    nas.wait_until_succeeds(configmap, timeout=120)
+    # Applied last, it took the binding over from k3s' rolebindings
+    binding = "k3s kubectl get clusterrolebinding kube-apiserver-kubelet-admin"
+    owner = f"{binding} -o jsonpath='{{.metadata.annotations.objectset\\.rio\\.cattle\\.io/owner-name}}'"
+    nas.wait_until_succeeds(f"test \"$({owner})\" = prune-test", timeout=60)
+    # What switch-to-configuration does when the links change: both units changed, so it restarts them
+    nas.succeed("systemctl restart k3s-prune-links.service k3s-prune-addons.service")
+    nas.fail(f"test -L {manifests}/prune-test.yaml")
+    nas.fail("k3s kubectl -n kube-system get addon prune-test")
+    nas.wait_until_fails(configmap, timeout=60)
+    nas.succeed(binding)
+    assert set(nas.succeed(addons).split()) == before, (before, nas.succeed(addons))
+    nas.succeed(f"test -f {manifests}/coredns.yaml && test -f {manifests}/metrics-server/metrics-server-deployment.yaml")
+    nas.succeed("k3s kubectl -n kube-system rollout status deploy/coredns --timeout=60s")
+    nas.succeed("k3s kubectl -n kube-system rollout status deploy/metrics-server --timeout=60s")
+    # One left behind by a generation switched to at the boot below
+    nas.succeed(f"ln -s $(readlink -f /etc/k3s-prune-test/prune-test-boot.yaml) {manifests}/prune-test-boot.yaml")
+    nas.wait_until_succeeds("k3s kubectl -n default get configmap prune-test-boot", timeout=120)
+
 with subtest("shutdown: a reboot drains the node first, leaving no Failed pods and no cordon"):
     nas.wait_until_succeeds("k3s kubectl -n cilium rollout status deploy/cilium-operator --timeout=10s", timeout=300)
     # Through logind, which sends PrepareForShutdown; the driver's reboot() presses Ctrl+Alt+Del, which doesn't
@@ -367,3 +392,14 @@ with subtest("storage: after a reboot the pools import from the cache, keys load
             nas.succeed(f"systemctl is-active mnt-{pool}-{child}.mount")
     check_pools()
     nas.succeed("test -d /mnt/cluster/data/default-mode-test")
+
+with subtest("k3s: the boot removes a manifest left behind before k3s starts, then its Addon and objects"):
+    nas.succeed("journalctl -b -u k3s-prune-links | grep -q 'Removed .*/prune-test-boot.yaml'")
+    nas.succeed(
+        "test $(systemctl show -p ExecMainExitTimestampMonotonic --value k3s-prune-links)"
+        " -lt $(systemctl show -p ExecMainStartTimestampMonotonic --value k3s)"
+    )
+    nas.fail("test -L /mnt/cluster/k3s/server/manifests/prune-test-boot.yaml")
+    nas.wait_until_succeeds("systemctl is-active k3s-prune-addons.service", timeout=600)
+    nas.fail("k3s kubectl -n kube-system get addon prune-test-boot")
+    nas.wait_until_fails("k3s kubectl -n default get configmap prune-test-boot", timeout=60)

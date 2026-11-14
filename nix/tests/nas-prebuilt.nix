@@ -10,6 +10,24 @@ in
   nodes.nas.homelab.cilium.cidr-groups.localLANCIDR4 = lib.mkForce "192.168.1.0/25";
   # The CPUs of a public runner. More vCPUs than the host has stall the guest under nested KVM
   nodes.nas.virtualisation.cores = lib.mkForce 4;
+  # Manifests that a later generation no longer has, which the k3s subtests link into k3s' manifests directory. The
+  # first also declares an object of a manifest k3s bundles, as one that moved to a remaining manifest
+  nodes.nas.environment.etc."k3s-prune-test/prune-test.yaml".text = ''
+    apiVersion: v1
+    kind: ConfigMap
+    metadata: {name: prune-test, namespace: default}
+    ---
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata: {name: kube-apiserver-kubelet-admin}
+    roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: "system:kubelet-api-admin"}
+    subjects: [{apiGroup: rbac.authorization.k8s.io, kind: User, name: kube-apiserver}]
+  '';
+  nodes.nas.environment.etc."k3s-prune-test/prune-test-boot.yaml".text = ''
+    apiVersion: v1
+    kind: ConfigMap
+    metadata: {name: prune-test-boot, namespace: default}
+  '';
   nodes.lan = lib.mkMerge [
     client
     # For the pods allowed to reach the LAN
