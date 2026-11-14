@@ -110,6 +110,11 @@ with subtest("networking: client-vpn brings up WireGuard without SYS_MODULE"):
     nas.succeed("test -d /sys/module/wireguard")
 
 with subtest("networking: cluster-wide policies: one object per name, pod-to-local-lan allows egress to the LAN"):
+    # The deploy controller applies the policies' manifest only once Cilium has made its CRDs, a pass or more after the
+    # first; before that no policy denies anything, and the probe below would pass without one
+    nas.wait_until_succeeds(
+        "k3s kubectl get ccnp pod-to-apiserver -o jsonpath='{.spec.egress}' | grep -q kube-apiserver", timeout=300
+    )
     lan.succeed("(nc -lk 8000 >/dev/null 2>&1 &)")
     lan_ip = lan.succeed("ip -4 -o addr show eth1 | awk '{print $4}' | cut -d/ -f1").strip()
     # A pod with local-lan-egress and nothing else (client-vpn's own policy allows the world), in client-vpn's image
@@ -125,7 +130,6 @@ with subtest("networking: cluster-wide policies: one object per name, pod-to-loc
     nas.wait_until_succeeds(
         f"k3s kubectl -n default exec lan-probe -- timeout 3 bash -c 'exec 3<>/dev/tcp/{lan_ip}/8000'", timeout=60
     )
-    nas.succeed("k3s kubectl get ccnp pod-to-apiserver -o jsonpath='{.spec.egress}' | grep -q kube-apiserver")
 
 with subtest("networking: NodePorts are served on the LAN's addresses only, not on privacy-vpn"):
     # Any key brings the interface up with its address, which is all Cilium looks at; no handshake needed
