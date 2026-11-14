@@ -8,8 +8,12 @@ in
 {
   # The host firewall's LAN is the test VLAN's lower half: lan and the nas get .1 and .2, outside sits above it
   nodes.nas.homelab.cilium.cidr-groups.localLANCIDR4 = lib.mkForce "192.168.1.0/25";
-  # The CPUs of a public runner. More vCPUs than the host has stall the guest under nested KVM
+  # The CPUs of a public runner, or up to 8 on a host with more: the last -smp counts. More vCPUs than the host has
+  # stall the guest under nested KVM
   nodes.nas.virtualisation.cores = lib.mkForce 4;
+  nodes.nas.virtualisation.qemu.options = [
+    "-smp $(n=$(${hostPkgs.coreutils}/bin/nproc); echo $((n < 8 ? n : 8)))"
+  ];
   # Manifests that a later generation no longer has, which the k3s subtests link into k3s' manifests directory. The
   # first also declares an object of a manifest k3s bundles, as one that moved to a remaining manifest
   nodes.nas.environment.etc."k3s-prune-test/prune-test.yaml".text = ''
