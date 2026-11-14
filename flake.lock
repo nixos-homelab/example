@@ -209,9 +209,6 @@
         "kube-generators": [
           "kube-generators"
         ],
-        "kubetree": [
-          "kubetree"
-        ],
         "nixpkgs": [
           "nixpkgs"
         ],
@@ -223,11 +220,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794612319,
-        "narHash": "sha256-4j9IZxc/uE+fck46yehJl913BQ5sEJL/NIauxukjDaU=",
+        "lastModified": 1794640190,
+        "narHash": "sha256-AZy/0qLq+Lezqd15L3GJAC4b4vBB9n+2FzrvYxcVzFU=",
         "owner": "nixos-homelab",
         "repo": "finance",
-        "rev": "eec572c41a12b28606e91e80f928aac746590dc2",
+        "rev": "b5fbe98343af93ea65bee7124d96b7b05026abc6",
         "type": "github"
       },
       "original": {
@@ -253,9 +250,6 @@
         "kube-generators": [
           "kube-generators"
         ],
-        "kubetree": [
-          "kubetree"
-        ],
         "nixpkgs": [
           "nixpkgs"
         ],
@@ -267,11 +261,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794612327,
-        "narHash": "sha256-3OXO+iZDkHB8B+TaayQWAzN6P4EJLGzfztqLGrhAK7U=",
+        "lastModified": 1794640196,
+        "narHash": "sha256-7PNekGlVhWN8THQGfjFygyCxTDZmliIPsd70biYFurg=",
         "owner": "nixos-homelab",
         "repo": "media",
-        "rev": "ad473207dcbf3219aa71756be82b29073294364d",
+        "rev": "3b201757e598ab375bbc69eb019c8310ae175e14",
         "type": "github"
       },
       "original": {
@@ -294,9 +288,6 @@
         "kube-generators": [
           "kube-generators"
         ],
-        "kubetree": [
-          "kubetree"
-        ],
         "nixpkgs": [
           "nixpkgs"
         ],
@@ -308,11 +299,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794612324,
-        "narHash": "sha256-TzE/w/V+/lQ8T46B339JaqNl/KrGHpCFxBkwDR12ClQ=",
+        "lastModified": 1794640194,
+        "narHash": "sha256-bFG1Zfwobu5M3a802iaAHTI38mtBAaR/Hw+XrPFeax8=",
         "owner": "nixos-homelab",
         "repo": "monitoring",
-        "rev": "4cbf7befacd2b21b85e4a1a669a7a7520f9445d6",
+        "rev": "a996ffaf9e5ec862c3c9e202dd6baf5cccd7b07f",
         "type": "github"
       },
       "original": {
@@ -335,9 +326,6 @@
         "kube-generators": [
           "kube-generators"
         ],
-        "kubetree": [
-          "kubetree"
-        ],
         "nixhelm": [
           "nixhelm"
         ],
@@ -353,11 +341,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794612831,
-        "narHash": "sha256-9Rq8wz6YtH9KkyltTLeSNzqxJ8eP++/1CC1rJXTJllU=",
+        "lastModified": 1794640169,
+        "narHash": "sha256-Nrhz2cb/mL6/1fArEdl3Zll75yfG70EmczVguL+wfMc=",
         "owner": "nixos-homelab",
         "repo": "networking",
-        "rev": "b807d57d370564b4c31b34fffeeafd0fc0e8d23a",
+        "rev": "1961dd6c1af0ffc9598bac58a2d6ffb51ccd23c9",
         "type": "github"
       },
       "original": {
@@ -380,9 +368,6 @@
         "kube-generators": [
           "kube-generators"
         ],
-        "kubetree": [
-          "kubetree"
-        ],
         "nixpkgs": [
           "nixpkgs"
         ],
@@ -394,11 +379,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794612321,
-        "narHash": "sha256-1FxGMiDX1VAY/qSw5EUTl+SAOMIrA0MPyPyVoqlEeSw=",
+        "lastModified": 1794640192,
+        "narHash": "sha256-X1/7X8gknyt4TleRUrT2rTyIYwmO6UmDheliLgsT5XY=",
         "owner": "nixos-homelab",
         "repo": "personal",
-        "rev": "dc8df72753a37d9a577ad529f56645d8e187684f",
+        "rev": "a5d9de457af9611ffa9426d46dc7f70e9e6175a2",
         "type": "github"
       },
       "original": {
@@ -422,9 +407,6 @@
           "kube-generators"
         ],
         "kubenix": "kubenix",
-        "kubetree": [
-          "kubetree"
-        ],
         "nixhelm": [
           "nixhelm"
         ],
@@ -439,11 +421,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794612692,
-        "narHash": "sha256-h/+TsSGEZ0R7oKlJKWdT5HfrCSjv7J0vjXgWYBbsEy8=",
+        "lastModified": 1794640154,
+        "narHash": "sha256-dokhL9zP5LdIT6ZuBLkCDbe1yVdeqB1HgP6iuQuPZlc=",
         "owner": "nixos-homelab",
         "repo": "shared",
-        "rev": "6bf024bfcfa627eb2ced2d59f26640eda3d221b7",
+        "rev": "127ea10e956144408d59536fd02f41e2c4a4565f",
         "type": "github"
       },
       "original": {
@@ -478,9 +460,6 @@
         "kube-generators": [
           "kube-generators"
         ],
-        "kubetree": [
-          "kubetree"
-        ],
         "nixpkgs": [
           "nixpkgs"
         ],
@@ -489,11 +468,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794384271,
-        "narHash": "sha256-BUUMBdgk5FeuxcUB0Yp9vF0sAWepF0RuZP3DNJ8rOrE=",
+        "lastModified": 1794615244,
+        "narHash": "sha256-GoG+x8vL6uO4Udav13ovKDiqSID7NsddrT/ojfsVves=",
         "owner": "andsens",
         "repo": "k8sss",
-        "rev": "79fb2c582a709d826d0ff88a1f41af94e629ef0f",
+        "rev": "8dc1b4b21727c4a52ab3ccf46b4e4de84517880e",
         "type": "github"
       },
       "original": {
@@ -547,35 +526,6 @@
       "original": {
         "owner": "hall",
         "repo": "kubenix",
-        "type": "github"
-      }
-    },
-    "kubetree": {
-      "inputs": {
-        "docs": [
-          "docs"
-        ],
-        "flake-parts": [
-          "flake-parts"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "systems": [
-          "systems"
-        ]
-      },
-      "locked": {
-        "lastModified": 1794138863,
-        "narHash": "sha256-1mgcCcxEDqE283rM8a8V7Xso5qHGrq3+6jd5/L4RnfU=",
-        "owner": "andsens",
-        "repo": "nix-kubetree",
-        "rev": "7e9e2c3b4bddc9ea23b252bfc2b2c1f6307b92d4",
-        "type": "github"
-      },
-      "original": {
-        "owner": "andsens",
-        "repo": "nix-kubetree",
         "type": "github"
       }
     },
@@ -807,7 +757,6 @@
         "homelab-shared": "homelab-shared",
         "k8sss": "k8sss",
         "kube-generators": "kube-generators",
-        "kubetree": "kubetree",
         "lanzaboote": "lanzaboote",
         "nixhelm": "nixhelm",
         "nixpkgs": "nixpkgs",

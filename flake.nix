@@ -60,7 +60,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-parts.follows = "flake-parts";
       inputs.setup-secrets.follows = "setup-secrets";
-      inputs.kubetree.follows = "kubetree";
       inputs.k8sss.follows = "k8sss";
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
@@ -72,7 +71,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-parts.follows = "flake-parts";
       inputs.setup-secrets.follows = "setup-secrets";
-      inputs.kubetree.follows = "kubetree";
       inputs.homelab-shared.follows = "homelab-shared";
       inputs.kube-generators.follows = "kube-generators";
       inputs.homelab-networking.follows = "homelab-networking";
@@ -84,7 +82,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-parts.follows = "flake-parts";
       inputs.setup-secrets.follows = "setup-secrets";
-      inputs.kubetree.follows = "kubetree";
       inputs.homelab-shared.follows = "homelab-shared";
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
@@ -95,7 +92,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-parts.follows = "flake-parts";
       inputs.setup-secrets.follows = "setup-secrets";
-      inputs.kubetree.follows = "kubetree";
       inputs.homelab-shared.follows = "homelab-shared";
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
@@ -106,7 +102,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-parts.follows = "flake-parts";
       inputs.setup-secrets.follows = "setup-secrets";
-      inputs.kubetree.follows = "kubetree";
       inputs.homelab-shared.follows = "homelab-shared";
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
@@ -118,16 +113,8 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-parts.follows = "flake-parts";
       inputs.setup-secrets.follows = "setup-secrets";
-      inputs.kubetree.follows = "kubetree";
       inputs.homelab-shared.follows = "homelab-shared";
       inputs.kube-generators.follows = "kube-generators";
-      inputs.docs.follows = "docs";
-    };
-    kubetree = {
-      url = "github:andsens/nix-kubetree";
-      inputs.systems.follows = "systems";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.flake-parts.follows = "flake-parts";
       inputs.docs.follows = "docs";
     };
     setup-secrets = {
@@ -142,7 +129,6 @@
       inputs.systems.follows = "systems";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-parts.follows = "flake-parts";
-      inputs.kubetree.follows = "kubetree";
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
     };
