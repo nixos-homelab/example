@@ -206,6 +206,9 @@
         "homelab-shared": [
           "homelab-shared"
         ],
+        "homelab-storage": [
+          "homelab-storage"
+        ],
         "kube-generators": [
           "kube-generators"
         ],
@@ -220,11 +223,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794650842,
-        "narHash": "sha256-zHQvzMLJ1Ah7yQqlkBf6MkOJcK31SOUQCUnksIElyIw=",
+        "lastModified": 1794654233,
+        "narHash": "sha256-2IdhVQX4dP/p08hUs2sdpw4vlg4qmC1rjRfAOVLZ2Lk=",
         "owner": "nixos-homelab",
         "repo": "finance",
-        "rev": "1d663dc22b8f3dbab354736e18fc2914a2a4597d",
+        "rev": "1eb3531ec51abc406c025f04b9573bf7c00815df",
         "type": "github"
       },
       "original": {
@@ -288,6 +291,9 @@
         "homelab-shared": [
           "homelab-shared"
         ],
+        "homelab-storage": [
+          "homelab-storage"
+        ],
         "kube-generators": [
           "kube-generators"
         ],
@@ -302,11 +308,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794650843,
-        "narHash": "sha256-uVocXnO4VS6hRYNNIRdNHTROzF5Fh8S3Qn7Sz41MocA=",
+        "lastModified": 1794654238,
+        "narHash": "sha256-6GA64T5fAZ1r4A9HuEDtpgH8BVDD7pyq6U5ef7M9WWE=",
         "owner": "nixos-homelab",
         "repo": "monitoring",
-        "rev": "fd966b52c2000ac4850ae4c16b7d044ba6725774",
+        "rev": "b0b6593931d055f9cefc809f2a8ef0fa6623d57e",
         "type": "github"
       },
       "original": {
@@ -368,6 +374,9 @@
         "homelab-shared": [
           "homelab-shared"
         ],
+        "homelab-storage": [
+          "homelab-storage"
+        ],
         "kube-generators": [
           "kube-generators"
         ],
@@ -382,11 +391,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794650842,
-        "narHash": "sha256-/QA+G1lrlPb6CexkJTZ29qhV6kPdp7AUBCK78++Awtw=",
+        "lastModified": 1794654235,
+        "narHash": "sha256-1pk8Bm3a0kaau35ex3JrI0rv97g2qrfFVNVsb6qUcbg=",
         "owner": "nixos-homelab",
         "repo": "personal",
-        "rev": "119d52c4254f102abbae0d840bd94b718118c0c6",
+        "rev": "b02ed4731feba78fc0d5297d7957ef325e38c79e",
         "type": "github"
       },
       "original": {
@@ -424,16 +433,54 @@
         ]
       },
       "locked": {
-        "lastModified": 1794649628,
-        "narHash": "sha256-gCEMiqQlwuGVKUJUQzjl5vMmR/YimhHxt5jNlB0ESno=",
+        "lastModified": 1794652868,
+        "narHash": "sha256-KrbvYxVajZ1LYpF5qNm2r6lYmz1ZyKo5QXakDLf5Of0=",
         "owner": "nixos-homelab",
         "repo": "shared",
-        "rev": "826abd1ad7fa9d06239705563def111e92daf70d",
+        "rev": "620c3d75b5c3fa2a0dee8c241760bdf0010968b2",
         "type": "github"
       },
       "original": {
         "owner": "nixos-homelab",
         "repo": "shared",
+        "type": "github"
+      }
+    },
+    "homelab-storage": {
+      "inputs": {
+        "docs": [
+          "docs"
+        ],
+        "flake-parts": [
+          "flake-parts"
+        ],
+        "homelab-shared": [
+          "homelab-shared"
+        ],
+        "kube-generators": [
+          "kube-generators"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "setup-secrets": [
+          "setup-secrets"
+        ],
+        "systems": [
+          "systems"
+        ]
+      },
+      "locked": {
+        "lastModified": 1794652941,
+        "narHash": "sha256-axc02Rope7PSYYLgte/AWlyPF8hynMvhmZQGisMjndk=",
+        "owner": "nixos-homelab",
+        "repo": "storage",
+        "rev": "2c0da7723fbfa9dfba6ee25c255c0f24d1d75175",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos-homelab",
+        "repo": "storage",
         "type": "github"
       }
     },
@@ -758,6 +805,7 @@
         "homelab-networking": "homelab-networking",
         "homelab-personal": "homelab-personal",
         "homelab-shared": "homelab-shared",
+        "homelab-storage": "homelab-storage",
         "k8sss": "k8sss",
         "kube-generators": "kube-generators",
         "lanzaboote": "lanzaboote",

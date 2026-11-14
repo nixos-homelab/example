@@ -12,7 +12,7 @@ let
 in
 {
   # k3s and the data of the apps on the cluster pool, which the pods mount over NFS, as they do the media library
-  imports = [ inputs.homelab-shared.nixosModules.nfs-provisioner ];
+  imports = [ inputs.homelab-storage.nixosModules.nfs-provisioner ];
   config = {
     users = {
       users.cluster = {

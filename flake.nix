@@ -65,6 +65,16 @@
       inputs.docs.follows = "docs";
       inputs.nixhelm.follows = "nixhelm";
     };
+    homelab-storage = {
+      url = "github:nixos-homelab/storage";
+      inputs.systems.follows = "systems";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+      inputs.setup-secrets.follows = "setup-secrets";
+      inputs.homelab-shared.follows = "homelab-shared";
+      inputs.kube-generators.follows = "kube-generators";
+      inputs.docs.follows = "docs";
+    };
     homelab-media = {
       url = "github:nixos-homelab/media";
       inputs.systems.follows = "systems";
@@ -83,6 +93,7 @@
       inputs.flake-parts.follows = "flake-parts";
       inputs.setup-secrets.follows = "setup-secrets";
       inputs.homelab-shared.follows = "homelab-shared";
+      inputs.homelab-storage.follows = "homelab-storage";
       inputs.kube-generators.follows = "kube-generators";
       inputs.homelab-networking.follows = "homelab-networking";
       inputs.docs.follows = "docs";
@@ -94,6 +105,7 @@
       inputs.flake-parts.follows = "flake-parts";
       inputs.setup-secrets.follows = "setup-secrets";
       inputs.homelab-shared.follows = "homelab-shared";
+      inputs.homelab-storage.follows = "homelab-storage";
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
     };
@@ -115,6 +127,7 @@
       inputs.flake-parts.follows = "flake-parts";
       inputs.setup-secrets.follows = "setup-secrets";
       inputs.homelab-shared.follows = "homelab-shared";
+      inputs.homelab-storage.follows = "homelab-storage";
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
     };

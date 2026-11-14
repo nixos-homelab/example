@@ -13,8 +13,8 @@ in
 {
   # The apps, on a homepage of links to them
   imports = [
-    inputs.homelab-shared.nixosModules.postgresql
-    inputs.homelab-shared.nixosModules.redis
+    inputs.homelab-storage.nixosModules.postgresql
+    inputs.homelab-storage.nixosModules.redis
     inputs.homelab-media.nixosModules.flood
     inputs.homelab-media.nixosModules.plex
     inputs.homelab-media.nixosModules.prowlarr
