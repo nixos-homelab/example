@@ -25,7 +25,6 @@ in
     inputs.homelab-monitoring.nixosModules.alloy
     inputs.homelab-monitoring.nixosModules.grafana
     inputs.homelab-monitoring.nixosModules.node-exporter
-    inputs.homelab-monitoring.nixosModules.metrics-server
     inputs.homelab-monitoring.nixosModules.mimir
     inputs.homelab-monitoring.nixosModules.smartctl-exporter
     inputs.homelab-monitoring.nixosModules.zfs-exporter
@@ -103,7 +102,6 @@ in
       volumes."/mnt/media/movies".nfs = nfs "/mnt/media/movies";
     };
     prowlarr.enable = true;
-    metrics-server.enable = true;
     mimir.enable = true;
     grafana.enable = true;
     alloy.enable = true;

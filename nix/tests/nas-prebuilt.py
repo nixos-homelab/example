@@ -315,10 +315,15 @@ with subtest("apps: every workload rolls out with Ready pods, every HTTPRoute is
         )
     assert not failed, f"Jobs that didn't complete: {sorted(failed)}"
 
-with subtest("k3s: the metrics API answers, and metrics-server takes pods with its egress label"):
+with subtest("k3s: its bundled metrics-server answers the metrics API and takes pods with its egress label"):
+    nas.succeed(
+        "k3s kubectl -n kube-system get deploy metrics-server -o jsonpath='{.spec.template.spec.containers[0].image}'"
+        " | grep -q rancher/mirrored-metrics-server"
+    )
     nas.wait_until_succeeds("k3s kubectl top node", timeout=300)
+    nas.wait_until_succeeds("k3s kubectl top pod -n kube-system", timeout=120)
     # The apiserver comes from the host, which Cilium lets in regardless; pods get through only when the netpols select
-    # the release's pods
+    # the bundled pods
     ms = nas.succeed(
         "k3s kubectl -n kube-system get pod -l k8s-app=metrics-server -o jsonpath='{.items[0].status.podIP}'"
     ).strip()

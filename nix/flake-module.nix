@@ -79,6 +79,11 @@ in
           };
           installer-iso = configs.iso.config.sbfde.installer.isoImage;
         };
+        # Dead Nix code. Pattern names stay: modules take { config, lib, pkgs, ... } whether they use them or not
+        checks.deadnix = pkgs.runCommand "deadnix" { nativeBuildInputs = [ pkgs.deadnix ]; } ''
+          deadnix --fail --no-lambda-pattern-names ${self}
+          touch $out
+        '';
         # What the NAS sends to k3s, against the Kubernetes and CRD schemas, with every image preloaded
         checks.manifests = inputs.homelab-shared.lib.checks.manifests {
           inherit pkgs;

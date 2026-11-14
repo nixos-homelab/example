@@ -95,7 +95,6 @@
       inputs.homelab-shared.follows = "homelab-shared";
       inputs.homelab-storage.follows = "homelab-storage";
       inputs.kube-generators.follows = "kube-generators";
-      inputs.homelab-networking.follows = "homelab-networking";
       inputs.docs.follows = "docs";
     };
     homelab-finance = {
