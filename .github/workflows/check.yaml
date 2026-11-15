@@ -50,8 +50,17 @@ jobs:
           experimental-features = nix-command flakes
           system-features = kvm nixos-test benchmark big-parallel
           extra-substituters = file:///home/runner/nix-cache?trusted=true
+    # Runs died about five minutes into the VM test, with SIGTERM or a lost runner, and no failing step. The
+    # memory and /tmp at the start, and the memory once a minute during the check, say whether it runs out
+    - name: Show the runner's memory and disks
+      run: |
+        free -m
+        df -h / /tmp /home/runner
+        findmnt /tmp || true
     - name: Check the flake
-      run: nix flake check -L
+      run: |
+        (while sleep 60; do echo "memory: $(free -m | awk '/^Mem:/ {print "used " $3 " MiB, available " $7 " MiB"}')"; done) &
+        nix flake check -L
     # Everything not from cache.nixos.org, without the upstream image archives (fetched again from their registries)
     # and the disk image of the VM, which would take most of the 10 GB GitHub keeps per repository
     # The Nix daemon, which runs as root, makes the directory when it opens the substituter
