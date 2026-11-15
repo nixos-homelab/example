@@ -168,7 +168,8 @@ with subtest("apps: docs serves the site with the system's values to pods with c
         f"k3s kubectl -n default exec docs-probe -- curl -sfk -m 10 https://{ip}/shared/options/workloads/", timeout=60
     )
     row = page[page.index('id="homelab.workloads.domain"'):]
-    row = row[: row.index("</tr>")]
+    # Cell values carry break points (<wbr>) at their dots
+    row = row[: row.index("</tr>")].replace("<wbr>", "")
     assert "nd-value nd-changed" in row and "example.org" in row, row
     nas.fail(f"k3s kubectl -n default exec docs-stranger -- curl -sfk -m 5 https://{ip}/")
     nas.succeed("k3s kubectl -n default delete pod docs-probe docs-stranger --wait=false")
