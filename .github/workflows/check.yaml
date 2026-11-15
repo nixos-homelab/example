@@ -50,17 +50,22 @@ jobs:
           experimental-features = nix-command flakes
           system-features = kvm nixos-test benchmark big-parallel
           extra-substituters = file:///home/runner/nix-cache?trusted=true
-    # Runs died about five minutes into the VM test, with SIGTERM or a lost runner, and no failing step. The
-    # memory and /tmp at the start, and the memory once a minute during the check, say whether it runs out
-    - name: Show the runner's memory and disks
+    # nix flake check keeps its evaluator, about 8 GiB here, while it builds, and with the VMs beside it a public runner
+    # (16 GB) ran out of memory and the job was cancelled. So one evaluation, which builds what it imports (the Helm
+    # charts) and evaluates the packages too, writes the checks' derivations and exits, and the build evaluates nothing.
+    # The memory, once a minute, shows how close it gets
+    - name: Evaluate the flake
       run: |
-        free -m
-        df -h / /tmp /home/runner
-        findmnt /tmp || true
-    - name: Check the flake
+        nix eval --json .#. --apply 'flake: {
+          checks = map (check: check.drvPath) (builtins.attrValues flake.checks.x86_64-linux);
+          packages = map (package: package.drvPath) (builtins.attrValues flake.packages.x86_64-linux);
+        }' > outputs.json
+        jq -r '.checks[] + "^*"' outputs.json > checks.txt
+        cat checks.txt
+    - name: Build the checks
       run: |
         (while sleep 60; do echo "memory: $(free -m | awk '/^Mem:/ {print "used " $3 " MiB, available " $7 " MiB"}')"; done) &
-        nix flake check -L
+        xargs nix build -L --no-link < checks.txt
     # Everything not from cache.nixos.org, without the upstream image archives (fetched again from their registries)
     # and the disk image of the VM, which would take most of the 10 GB GitHub keeps per repository
     # The Nix daemon, which runs as root, makes the directory when it opens the substituter
