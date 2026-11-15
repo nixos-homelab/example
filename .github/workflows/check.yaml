@@ -17,8 +17,8 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    # A green run takes about 35 minutes; past this the runner is stuck, not slow
-    timeout-minutes: 45
+    # The full suite took up to about 50 minutes on a public runner; past this the runner is stuck, not slow
+    timeout-minutes: 60
     steps:
     # The VM closure and its images take more than the runner has free
     - name: Free disk space
