@@ -238,6 +238,47 @@ with subtest("apps: postgresql has generated passwords from Secrets, the apps us
     for sock in socks:
         nas.fail(f"su -s /bin/sh admin -c 'test -e {sock}'")
 
+with subtest("apps: docs serves the site with the system's values to pods with cluster egress, and no other pod"):
+    nas.wait_until_succeeds("k3s kubectl -n docs get certificate docs", timeout=600)
+    # Its certificate comes from ACME, which the VM can't reach: a self-signed issuer stands in
+    nas.succeed(
+        "k3s kubectl apply -f - <<'EOF'\n"
+        "apiVersion: cert-manager.io/v1\nkind: ClusterIssuer\nmetadata: {name: selfsigned}\nspec: {selfSigned: {}}\n"
+        "EOF"
+    )
+    nas.succeed(
+        "k3s kubectl -n docs patch certificate docs --type=merge -p '{\"spec\":{\"issuerRef\":{\"name\":\"selfsigned\"}}}'"
+    )
+    nas.wait_until_succeeds("k3s kubectl -n docs get secret docs-tls", timeout=300)
+    nas.wait_until_succeeds("k3s kubectl -n docs rollout status deploy/docs --timeout=10s", timeout=600)
+    ip = nas.wait_until_succeeds(
+        "k3s kubectl -n docs get svc docs-external -o jsonpath='{.status.loadBalancer.ingress[0].ip}' | grep .",
+        timeout=120,
+    ).strip()
+    # awk reads crictl's output to the end: an early exit would kill crictl with SIGPIPE, and pipefail fail the command
+    utils = nas.succeed(
+        "k3s crictl images | awk '$1 == \"cluster.local/utils\" && !found { print $1 \":\" $2; found = 1 }'"
+    ).strip()
+    assert utils, "no cluster.local/utils image"
+    probe = "trap exit TERM; sleep 600 & wait"
+    nas.succeed(
+        f"k3s kubectl -n default run docs-probe --image={utils} --image-pull-policy=Never"
+        f" --labels=cluster.local/cluster-egress=allow --command -- bash -c '{probe}'"
+    )
+    nas.succeed(f"k3s kubectl -n default run docs-stranger --image={utils} --image-pull-policy=Never --command -- bash -c '{probe}'")
+    nas.wait_until_succeeds(
+        "k3s kubectl -n default wait pod/docs-probe pod/docs-stranger --for=condition=Ready --timeout=10s", timeout=120
+    )
+    # The domain is set on this system, so its row carries the value, marked changed
+    page = nas.wait_until_succeeds(
+        f"k3s kubectl -n default exec docs-probe -- curl -sfk -m 10 https://{ip}/shared/options/workloads/", timeout=60
+    )
+    row = page[page.index('id="homelab.workloads.domain"'):]
+    row = row[: row.index("</tr>")]
+    assert "nd-value nd-changed" in row and "example.org" in row, row
+    nas.fail(f"k3s kubectl -n default exec docs-stranger -- curl -sfk -m 5 https://{ip}/")
+    nas.succeed("k3s kubectl -n default delete pod docs-probe docs-stranger --wait=false")
+
 with subtest("apps: every workload rolls out with Ready pods, every HTTPRoute is accepted with a backend that answers"):
     # Workloads that can't come up in the VM, and why
     expected_down = {

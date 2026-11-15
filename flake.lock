@@ -70,11 +70,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794384402,
-        "narHash": "sha256-v8IehW7jv8JU6ra2AbhSGlXZ/wtggtwSeyHx8vbu4IM=",
+        "lastModified": 1794749221,
+        "narHash": "sha256-kxxJoi+nrELSQ0KglIqiid4HdyDna8KKm2fjbTdzt0Q=",
         "owner": "andsens",
         "repo": "nix-docs",
-        "rev": "420df18d0c37d3ebe4f99c6e7291024d6fd60f80",
+        "rev": "7a1b16e73fe459caef2bd836a6170ec50847a8f2",
         "type": "github"
       },
       "original": {
@@ -233,6 +233,62 @@
       "original": {
         "owner": "nixos-homelab",
         "repo": "development",
+        "type": "github"
+      }
+    },
+    "homelab-docs": {
+      "inputs": {
+        "devshell": [
+          "devshell"
+        ],
+        "docs": [
+          "docs"
+        ],
+        "flake-parts": [
+          "flake-parts"
+        ],
+        "homelab-development": [
+          "homelab-development"
+        ],
+        "homelab-finance": [
+          "homelab-finance"
+        ],
+        "homelab-media": [
+          "homelab-media"
+        ],
+        "homelab-monitoring": [
+          "homelab-monitoring"
+        ],
+        "homelab-networking": [
+          "homelab-networking"
+        ],
+        "homelab-personal": [
+          "homelab-personal"
+        ],
+        "homelab-shared": [
+          "homelab-shared"
+        ],
+        "homelab-storage": [
+          "homelab-storage"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "systems": [
+          "systems"
+        ]
+      },
+      "locked": {
+        "lastModified": 1794749352,
+        "narHash": "sha256-o1FmLUP3e4oPy+Sjtm0WgTHgETEux/vnwa375rD7ePI=",
+        "owner": "nixos-homelab",
+        "repo": "docs",
+        "rev": "6b713fb74bb570595ee4a788088a48f4da76dfed",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos-homelab",
+        "repo": "docs",
         "type": "github"
       }
     },
@@ -841,6 +897,7 @@
         "flake-parts": "flake-parts",
         "hardware": "hardware",
         "homelab-development": "homelab-development",
+        "homelab-docs": "homelab-docs",
         "homelab-finance": "homelab-finance",
         "homelab-media": "homelab-media",
         "homelab-monitoring": "homelab-monitoring",
