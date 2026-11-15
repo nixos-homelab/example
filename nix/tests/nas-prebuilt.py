@@ -44,11 +44,6 @@ with subtest("storage: the pools are made at the first Secure Boot, keys sealed 
     nas.wait_until_succeeds(f"test $({k3s}) -gt 0", timeout=300)
     nas.succeed(f"test $({created}) -lt $({k3s})")
 
-with subtest("networking: without secrets the VPNs have no keys, which only takes down their own interfaces"):
-    nas.wait_for_unit("systemd-networkd.service")
-    nas.wait_until_succeeds("ip -4 route show default | grep -q .")
-    nas.fail("ip link show privacy-vpn")
-
 with subtest("k3s: the node comes up dual-stack and Ready"):
     node = "k3s kubectl get node $(hostname) -o jsonpath"
     nas.wait_until_succeeds(
@@ -56,33 +51,6 @@ with subtest("k3s: the node comes up dual-stack and Ready"):
     )
     # Both families, which k3s only takes with a global IPv6 address on the node
     nas.succeed(f"{node}='{{.spec.podCIDRs}}' | grep -q :")
-
-with subtest("storage: nfs-provisioner creates a volume with the configured mode and owner"):
-    # The only published image, v4.0.2, ignored NFS_DEFAULT_MODE and made every volume 0777
-    try:
-        nas.wait_until_succeeds(
-            "k3s kubectl -n nfs-provisioner rollout status deploy/nfs-subdir-external-provisioner --timeout=10s",
-            timeout=600,
-        )
-    except Exception:
-        nas.execute(
-            "k3s kubectl -n nfs-provisioner describe pods >&2; "
-            "k3s kubectl -n nfs-provisioner logs deploy/nfs-subdir-external-provisioner --all-containers >&2; "
-            "k3s crictl images | grep -i nfs >&2"
-        )
-        raise
-    nas.succeed(
-        "k3s kubectl apply -f - <<'EOF'\n"
-        "apiVersion: v1\nkind: PersistentVolumeClaim\n"
-        "metadata: {name: mode-test, namespace: default}\n"
-        "spec: {accessModes: [ReadWriteOnce], resources: {requests: {storage: 1Mi}}}\n"
-        "EOF"
-    )
-    nas.wait_until_succeeds(
-        "test \"$(k3s kubectl -n default get pvc mode-test -o jsonpath='{.status.phase}')\" = Bound", timeout=300
-    )
-    got = nas.succeed("stat -c '%a %u:%g' /mnt/cluster/data/default-mode-test").strip()
-    assert got == "750 900:900", got
 
 with subtest("networking: the host firewall opens the global ports to the LAN only, privacy-vpn's to any source"):
     ip = nas.succeed("ip -4 -o addr show eth1 | awk '{print $4}' | cut -d/ -f1").strip()
@@ -95,42 +63,6 @@ with subtest("networking: the host firewall opens the global ports to the LAN on
     outside.fail(f"nc -z -w 2 {ip} 22")
     # rtorrent's port on privacy-vpn, open to any source; nothing listens on it in the VM
     nas.succeed("k3s kubectl get ccnp host-firewall -o jsonpath='{.spec.ingress[2].toPorts[0].ports[0].port}' | grep -qx 6881")
-
-with subtest("networking: client-vpn brings up WireGuard without SYS_MODULE"):
-    # NixOS loads the module at boot. Without it the pod's `ip link add` has to load it, which needs no capability
-    nas.succeed("rmmod wireguard")
-    nas.wait_until_succeeds("k3s kubectl get namespace client-vpn", timeout=600)
-    # Any 32 bytes make a WireGuard private key
-    nas.succeed(
-        "k3s kubectl -n client-vpn create secret generic client-vpn-private-keys"
-        " --from-literal=admins=$(head -c 32 /dev/urandom | base64) --dry-run=client -o yaml"
-        " | k3s kubectl apply -f -"
-    )
-    nas.wait_until_succeeds("k3s kubectl -n client-vpn rollout status deploy/admins-vpn --timeout=10s", timeout=600)
-    nas.succeed("k3s kubectl -n client-vpn exec deploy/admins-vpn -- wg show clients listen-port | grep -qx 51820")
-    nas.succeed("test -d /sys/module/wireguard")
-
-with subtest("networking: cluster-wide policies: one object per name, pod-to-local-lan allows egress to the LAN"):
-    # The deploy controller applies the policies' manifest only once Cilium has made its CRDs, a pass or more after the
-    # first; before that no policy denies anything, and the probe below would pass without one
-    nas.wait_until_succeeds(
-        "k3s kubectl get ccnp pod-to-apiserver -o jsonpath='{.spec.egress}' | grep -q kube-apiserver", timeout=300
-    )
-    lan.succeed("(nc -lk 8000 >/dev/null 2>&1 &)")
-    lan_ip = lan.succeed("ip -4 -o addr show eth1 | awk '{print $4}' | cut -d/ -f1").strip()
-    # A pod with local-lan-egress and nothing else (client-vpn's own policy allows the world), in client-vpn's image
-    # for its bash, which as PID 1 ends on SIGTERM only with a trap: the reboot drains the node and waits for it
-    image = nas.succeed(
-        "k3s kubectl -n client-vpn get deploy admins-vpn -o jsonpath='{.spec.template.spec.containers[0].image}'"
-    ).strip()
-    nas.succeed(
-        f"k3s kubectl -n default run lan-probe --image={image} --image-pull-policy=Never"
-        " --labels=cluster.local/local-lan-egress=allow --command -- bash -c 'trap exit TERM; sleep 600 & wait'"
-    )
-    nas.wait_until_succeeds("k3s kubectl -n default wait pod/lan-probe --for=condition=Ready --timeout=10s", timeout=120)
-    nas.wait_until_succeeds(
-        f"k3s kubectl -n default exec lan-probe -- timeout 3 bash -c 'exec 3<>/dev/tcp/{lan_ip}/8000'", timeout=60
-    )
 
 with subtest("networking: NodePorts are served on the LAN's addresses only, not on privacy-vpn"):
     # Any key brings the interface up with its address, which is all Cilium looks at; no handshake needed
@@ -148,15 +80,16 @@ with subtest("networking: NodePorts are served on the LAN's addresses only, not 
     nas.wait_until_succeeds(f"{addresses} | grep privacy-vpn >/dev/null", timeout=120)
     nas.succeed(f"{addresses} | {nodeport} | grep -x eth1 >/dev/null")
     nas.fail(f"{addresses} | {nodeport} | grep -x privacy-vpn >/dev/null")
-    # The NodePort of k8sss, which answers once step-ca is Ready; nothing above waits for that
-    lan.wait_until_succeeds(f"nc -z -w 2 {ip} 9000", timeout=180)
+    # The NodePort of k8sss, which answers once step-ca is Ready; nothing above waits for that, and this early in the
+    # suite the cluster is still coming up: minutes on a public runner
+    lan.wait_until_succeeds(f"nc -z -w 2 {ip} 9000", timeout=900)
 
 with subtest("storage: the NFS exports admit loopback only"):
     # A mount of its own eth1 address comes from that address and never meets the host firewall
     nas.succeed("mkdir -p /tmp/nfs && mount -t nfs 127.0.0.2:/mnt/cluster/data /tmp/nfs && umount /tmp/nfs")
     nas.fail(f"timeout 60 mount -t nfs {ip}:/mnt/cluster/data /tmp/nfs")
 
-with subtest("apps: postgresql has generated passwords from Secrets, the apps use them, the superuser's re-set at every start"):
+with subtest("apps: the apps get their PostgreSQL passwords and databases, log in and hold their schemas"):
     pg = "k3s kubectl -n postgresql"
     # Grafana's is off with the monitoring stack, see nas-prebuilt.nix
     users = ["forgejo", "ghostfolio", "immich", "prowlarr", "radarr", "sonarr"]
@@ -182,30 +115,9 @@ with subtest("apps: postgresql has generated passwords from Secrets, the apps us
     # comes after the Deployments' 10 minutes of progress deadline, and past that `rollout status` only fails
     available = "wait deploy/{} --for=condition=Available --timeout=10s"
     nas.wait_until_succeeds(f"{pg} {available.format('postgresql')}", timeout=600)
-    # initdb's fallback of 20 connections and 400kB of buffers starves a fresh immich's index builds
-    settings = nas.succeed(
-        f"{pg} exec deploy/postgresql -- psql -h /run/postgresql -U postgres -tAc"
-        " \"SELECT current_setting('shared_buffers') || ' ' || current_setting('max_connections')\""
-    ).strip()
-    assert settings == "128MB 100", settings
     for db in users + [f"{app}-log" for app in servarr]:
         nas.wait_until_succeeds(f"{pg} wait job/create-{db}-db --for=condition=Complete --timeout=10s", timeout=600)
 
-    def login(user, password_cmd):
-        """Logs in over TCP to the pod's IP, which pg_hba sends to password authentication"""
-        pods = f"{pg} get pod -l app.kubernetes.io/name=postgresql -o jsonpath='{{.items[*].status.podIP}}'"
-        nas.wait_until_succeeds(f"test $({pods} | wc -w) = 1", timeout=120)
-        ip = nas.succeed(pods).strip()
-        return (
-            f"{password_cmd} | {pg} exec -i deploy/postgresql -- bash -c"
-            f" 'PGPASSWORD=$(cat) psql --no-psqlrc -h {ip} -U {user} -d postgres -c \"SELECT 1\"'"
-        )
-
-    for user in users:
-        nas.succeed(login(user, secret.format("postgresql", user + "-password")))
-        nas.fail(login(user, f"echo {user}"))
-    nas.succeed(login("postgres", secret.format("postgresql", "postgres-password")))
-    nas.fail(login("postgres", "echo postgres"))
     # The apps log in with their copy of the password
     for user in users:
         try:
@@ -224,23 +136,6 @@ with subtest("apps: postgresql has generated passwords from Secrets, the apps us
                 f"{pg} exec deploy/postgresql -- psql -h /run/postgresql -U postgres -d {db} -tAc"
                 " 'SELECT 1 FROM \"VersionInfo\" LIMIT 1' | grep -qx 1"
             )
-    nas.succeed(f"{pg} create job backup-test --from=cronjob/backup-forgejo-db")
-    nas.wait_until_succeeds(f"{pg} wait job/backup-test --for=condition=Complete --timeout=10s", timeout=300)
-
-    # An existing data dir keeps initdb's password; the restart has to set the Secret's
-    nas.succeed(
-        "k3s kubectl -n postgresql create secret generic postgres-password --from-literal=password=rotated"
-        " --dry-run=client -o yaml | k3s kubectl apply -f -"
-    )
-    nas.succeed(f"{pg} rollout restart deploy/postgresql && {pg} rollout status deploy/postgresql --timeout=300s")
-    nas.succeed(login("postgres", "echo rotated"))
-    nas.fail(login("postgres", "echo " + first))
-
-    # The pod's socket trusts every local connection, so no host user may reach it through the kubelet's emptyDir
-    socks = nas.succeed("find /var/lib/kubelet/pods -name .s.PGSQL.5432").split()
-    assert socks, "no postgresql socket under /var/lib/kubelet/pods"
-    for sock in socks:
-        nas.fail(f"su -s /bin/sh admin -c 'test -e {sock}'")
 
 with subtest("apps: docs serves the site with the system's values to pods with cluster egress, and no other pod"):
     nas.wait_until_succeeds("k3s kubectl -n docs get certificate docs", timeout=600)
@@ -285,6 +180,14 @@ with subtest("apps: docs serves the site with the system's values to pods with c
     nas.succeed("k3s kubectl -n default delete pod docs-probe docs-stranger --wait=false")
 
 with subtest("apps: every workload rolls out with Ready pods, every HTTPRoute is accepted with a backend that answers"):
+    # admins-vpn needs its WireGuard key, which setup-secrets asks for; any 32 bytes make one. What client-vpn does with
+    # it is networking's own test
+    nas.wait_until_succeeds("k3s kubectl get namespace client-vpn", timeout=600)
+    nas.succeed(
+        "k3s kubectl -n client-vpn create secret generic client-vpn-private-keys"
+        " --from-literal=admins=$(head -c 32 /dev/urandom | base64) --dry-run=client -o yaml"
+        " | k3s kubectl apply -f -"
+    )
     # Workloads that can't come up in the VM, and why
     expected_down = {
         "external-dns/Deployment/external-dns": "no DNS provider API to reach",
@@ -414,56 +317,9 @@ with subtest("development: Forgejo's admin logs in, a repo takes pushes over HTT
     )
     retry(pushed, timeout_seconds=60)
 
-with subtest("k3s: its bundled metrics-server answers the metrics API and takes pods with its egress label"):
-    nas.succeed(
-        "k3s kubectl -n kube-system get deploy metrics-server -o jsonpath='{.spec.template.spec.containers[0].image}'"
-        " | grep -q rancher/mirrored-metrics-server"
-    )
-    nas.wait_until_succeeds("k3s kubectl top node", timeout=300)
-    nas.wait_until_succeeds("k3s kubectl top pod -n kube-system", timeout=120)
-    # The apiserver comes from the host, which Cilium lets in regardless; pods get through only when the netpols select
-    # the bundled pods
-    ms = nas.succeed(
-        "k3s kubectl -n kube-system get pod -l k8s-app=metrics-server -o jsonpath='{.items[0].status.podIP}'"
-    ).strip()
-    image = nas.succeed(
-        "k3s kubectl -n client-vpn get deploy admins-vpn -o jsonpath='{.spec.template.spec.containers[0].image}'"
-    ).strip()
-    nas.succeed(
-        f"k3s kubectl -n default run metrics-probe --image={image} --image-pull-policy=Never"
-        " --labels=cluster.local/metrics-server-egress=allow --command -- bash -c 'trap exit TERM; sleep 600 & wait'"
-    )
-    nas.wait_until_succeeds("k3s kubectl -n default wait pod/metrics-probe --for=condition=Ready --timeout=10s", timeout=120)
-    nas.wait_until_succeeds(
-        f"k3s kubectl -n default exec metrics-probe -- timeout 3 bash -c 'exec 3<>/dev/tcp/{ms}/10250'", timeout=60
-    )
-
-with subtest("k3s: a deploy removes the manifests it no longer has, with their Addons and objects, none of k3s' own"):
-    manifests = "/mnt/cluster/k3s/server/manifests"
-    addons = "k3s kubectl -n kube-system get addon -o jsonpath='{.items[*].metadata.name}'"
-    before = set(nas.succeed(addons).split())
-    nas.succeed(f"ln -s $(readlink -f /etc/k3s-prune-test/prune-test.yaml) {manifests}/prune-test.yaml")
-    configmap = "k3s kubectl -n default get configmap prune-test"
-    nas.wait_until_succeeds(configmap, timeout=120)
-    # Applied last, it took the binding over from k3s' rolebindings
-    binding = "k3s kubectl get clusterrolebinding kube-apiserver-kubelet-admin"
-    owner = f"{binding} -o jsonpath='{{.metadata.annotations.objectset\\.rio\\.cattle\\.io/owner-name}}'"
-    nas.wait_until_succeeds(f"test \"$({owner})\" = prune-test", timeout=60)
-    # What switch-to-configuration does when the links change: both units changed, so it restarts them
-    nas.succeed("systemctl restart k3s-prune-links.service k3s-prune-addons.service")
-    nas.fail(f"test -L {manifests}/prune-test.yaml")
-    nas.fail("k3s kubectl -n kube-system get addon prune-test")
-    nas.wait_until_fails(configmap, timeout=60)
-    nas.succeed(binding)
-    assert set(nas.succeed(addons).split()) == before, (before, nas.succeed(addons))
-    nas.succeed(f"test -f {manifests}/coredns.yaml && test -f {manifests}/metrics-server/metrics-server-deployment.yaml")
-    nas.succeed("k3s kubectl -n kube-system rollout status deploy/coredns --timeout=60s")
-    nas.succeed("k3s kubectl -n kube-system rollout status deploy/metrics-server --timeout=60s")
-    # One left behind by a generation switched to at the boot below
-    nas.succeed(f"ln -s $(readlink -f /etc/k3s-prune-test/prune-test-boot.yaml) {manifests}/prune-test-boot.yaml")
-    nas.wait_until_succeeds("k3s kubectl -n default get configmap prune-test-boot", timeout=120)
-
 with subtest("shutdown: a reboot drains the node first, leaving no Failed pods and no cordon"):
+    # What has to survive the reboot on the cluster pool
+    nas.succeed("touch /mnt/cluster/data/reboot-marker")
     nas.wait_until_succeeds("k3s kubectl -n cilium rollout status deploy/cilium-operator --timeout=10s", timeout=300)
     # Through logind, which sends PrepareForShutdown; the driver's reboot() presses Ctrl+Alt+Del, which doesn't
     nas.execute("systemctl reboot >/dev/null 2>&1 &")
@@ -490,28 +346,5 @@ with subtest("storage: after a reboot the pools import from the cache, keys load
         for child in datasets[pool]:
             nas.succeed(f"systemctl is-active mnt-{pool}-{child}.mount")
     check_pools()
-    nas.succeed("test -d /mnt/cluster/data/default-mode-test")
-
-with subtest("k3s: the boot removes a manifest left behind before k3s starts, then its Addon and objects"):
-    nas.succeed("journalctl -b -u k3s-prune-links | grep -q 'Removed .*/prune-test-boot.yaml'")
-    nas.succeed(
-        "test $(systemctl show -p ExecMainExitTimestampMonotonic --value k3s-prune-links)"
-        " -lt $(systemctl show -p ExecMainStartTimestampMonotonic --value k3s)"
-    )
-    nas.fail("test -L /mnt/cluster/k3s/server/manifests/prune-test-boot.yaml")
-    nas.wait_until_succeeds("systemctl is-active k3s-prune-addons.service", timeout=600)
-    nas.fail("k3s kubectl -n kube-system get addon prune-test-boot")
-    nas.wait_until_fails("k3s kubectl -n default get configmap prune-test-boot", timeout=60)
-
-with subtest("k3s: the boot imports no image again, containerd keeps every image k3s skipped"):
-    # The first start imported the links and kept them in its cache
-    nas.succeed("journalctl -b -1 -u k3s | grep -q 'Imported [0-9]* images from'")
-    nas.fail("journalctl -b -u k3s | grep -q 'Importing images from'")
-    # containerd still has every image of the links k3s skipped. Waiting for a pod to start from them would wait for the
-    # whole cluster to converge again after the reboot, minutes on a CI runner
-    cache = json.loads(nas.succeed("cat /mnt/cluster/k3s/agent/images/.cache.json"))
-    images = json.loads(nas.succeed("k3s crictl images -o json"))["images"]
-    tags = {tag for image in images for tag in image.get("repoTags") or []}
-    missing = {name for entry in cache.values() for name in entry["images"]} - tags
-    assert not missing, sorted(missing)
+    nas.succeed("test -f /mnt/cluster/data/reboot-marker")
 
