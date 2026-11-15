@@ -8,11 +8,11 @@ in
 {
   # The host firewall's LAN is the test VLAN's lower half: lan and the nas get .1 and .2, outside sits above it
   nodes.nas.homelab.cilium.cidr-groups.localLANCIDR4 = lib.mkForce "192.168.1.0/25";
-  # The CPUs of a public runner, or up to 8 on a host with more: the last -smp counts. More vCPUs than the host has
-  # stall the guest under nested KVM
-  nodes.nas.virtualisation.cores = lib.mkForce 4;
+  # The CPUs of the host but one, up to 8: the last -smp counts. More vCPUs than the host has stall the guest under
+  # nested KVM, and all of them starve the runner's own agent, which then loses its connection to GitHub
+  nodes.nas.virtualisation.cores = lib.mkForce 3;
   nodes.nas.virtualisation.qemu.options = [
-    "-smp $(n=$(${hostPkgs.coreutils}/bin/nproc); echo $((n < 8 ? n : 8)))"
+    "-smp $(n=$(${hostPkgs.coreutils}/bin/nproc); n=$((n > 1 ? n - 1 : 1)); echo $((n < 8 ? n : 8)))"
   ];
   # A client of the forge for the Forgejo subtest
   nodes.nas.environment.systemPackages = [ hostPkgs.git ];

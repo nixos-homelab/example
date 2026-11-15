@@ -9,9 +9,16 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request cancels the run of the older one; runs on main all finish
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    # A green run takes about 35 minutes; past this the runner is stuck, not slow
+    timeout-minutes: 45
     steps:
     # The VM closure and its images take more than the runner has free
     - name: Free disk space
