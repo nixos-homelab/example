@@ -35,8 +35,10 @@ in
     inputs.homelab-personal.nixosModules.imap-backup
     inputs.homelab-personal.nixosModules.immich
     inputs.homelab-development.nixosModules.forgejo
+    inputs.homelab-docs.nixosModules.docs
   ];
   config.homelab = {
+    docs.enable = true;
     homepage = {
       enable = true;
       sections.Media = {

@@ -2,6 +2,8 @@
 let
   client = {
     nixpkgs.hostPlatform = hostPkgs.stdenv.hostPlatform.system;
+    # netcat is all they run
+    virtualisation.memorySize = 512;
     environment.systemPackages = [ hostPkgs.netcat ];
   };
 in
@@ -14,6 +16,16 @@ in
   nodes.nas.virtualisation.qemu.options = [
     "-smp $(n=$(${hostPkgs.coreutils}/bin/nproc); echo $((n < 8 ? n : 8)))"
   ];
+  # The monitoring stack (Alloy, Mimir, the exporters, Grafana, which doesn't start without them) doubled the suite's
+  # time on a public runner's 4 CPUs, past an hour; monitoring is the repo to test it
+  nodes.nas.homelab = {
+    alloy.enable = lib.mkForce false;
+    grafana.enable = lib.mkForce false;
+    mimir.enable = lib.mkForce false;
+    node-exporter.enable = lib.mkForce false;
+    smartctl-exporter.enable = lib.mkForce false;
+    zfs-exporter.enable = lib.mkForce false;
+  };
   # A client of the forge for the Forgejo subtest
   nodes.nas.environment.systemPackages = [ hostPkgs.git ];
   # The disks of the pools last only as long as the test, so QEMU skips the flushes of ZFS and containerd
@@ -29,29 +41,7 @@ in
       }
     )
   ];
-  # Manifests that a later generation no longer has, which the k3s subtests link into k3s' manifests directory. The
-  # first also declares an object of a manifest k3s bundles, as one that moved to a remaining manifest
-  nodes.nas.environment.etc."k3s-prune-test/prune-test.yaml".text = ''
-    apiVersion: v1
-    kind: ConfigMap
-    metadata: {name: prune-test, namespace: default}
-    ---
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRoleBinding
-    metadata: {name: kube-apiserver-kubelet-admin}
-    roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: "system:kubelet-api-admin"}
-    subjects: [{apiGroup: rbac.authorization.k8s.io, kind: User, name: kube-apiserver}]
-  '';
-  nodes.nas.environment.etc."k3s-prune-test/prune-test-boot.yaml".text = ''
-    apiVersion: v1
-    kind: ConfigMap
-    metadata: {name: prune-test-boot, namespace: default}
-  '';
-  nodes.lan = lib.mkMerge [
-    client
-    # For the pods allowed to reach the LAN
-    { networking.firewall.allowedTCPPorts = [ 8000 ]; }
-  ];
+  nodes.lan = client;
   nodes.outside = lib.mkMerge [
     client
     {
