@@ -110,14 +110,17 @@ with subtest("apps: the apps get their PostgreSQL passwords and databases, log i
         # The consumer's copy in its own namespace
         theirs = secret.format(user, "postgresql-password")
         nas.succeed(f"cmp <({secret.format('postgresql', user + '-password')}) <({theirs})")
-    nas.wait_until_succeeds(f"{pg} rollout status deploy/postgresql --timeout=10s", timeout=600)
+    # Available, not `rollout status`: the pods waited for the Secrets setup-secrets makes above, which on a slow host
+    # comes after the Deployments' 10 minutes of progress deadline, and past that `rollout status` only fails
+    available = "wait deploy/{} --for=condition=Available --timeout=10s"
+    nas.wait_until_succeeds(f"{pg} {available.format('postgresql')}", timeout=600)
     for db in users + [f"{app}-log" for app in servarr]:
         nas.wait_until_succeeds(f"{pg} wait job/create-{db}-db --for=condition=Complete --timeout=10s", timeout=600)
 
     # The apps log in with their copy of the password
     for user in users:
         try:
-            nas.wait_until_succeeds(f"k3s kubectl -n {user} rollout status deploy/{user} --timeout=10s", timeout=900)
+            nas.wait_until_succeeds(f"k3s kubectl -n {user} {available.format(user)}", timeout=900)
         except Exception:
             nas.execute(
                 f"k3s kubectl -n {user} describe pods | tail -40 >&2;"
