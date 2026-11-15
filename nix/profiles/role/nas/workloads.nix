@@ -106,7 +106,27 @@ in
     };
     prowlarr.enable = true;
     mimir.enable = true;
-    grafana.enable = true;
+    grafana = {
+      enable = true;
+      # A dashboard of your own, written with the builders of homelab-monitoring's lib.grafana
+      dashboards.example.dashboard =
+        with inputs.homelab-monitoring.lib.grafana;
+        dashboard {
+          name = "example";
+          title = "Example";
+          layout = autoGrid { } [
+            (stat {
+              title = "Targets up";
+              queries = [ (prom "sum(up)" { instant = true; }) ];
+            })
+            (timeseries {
+              title = "Targets up by job";
+              queries = [ (prom "sum by (job) (up)" { legend = "{{job}}"; }) ];
+            })
+          ];
+        };
+      homeDashboard = "example";
+    };
     alloy.enable = true;
     node-exporter.enable = true;
     smartctl-exporter.enable = true;
