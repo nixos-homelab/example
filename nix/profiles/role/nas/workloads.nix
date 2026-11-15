@@ -34,6 +34,7 @@ in
     inputs.homelab-personal.nixosModules.syncthing
     inputs.homelab-personal.nixosModules.imap-backup
     inputs.homelab-personal.nixosModules.immich
+    inputs.homelab-development.nixosModules.forgejo
   ];
   config.homelab = {
     homepage = {
@@ -45,12 +46,14 @@ in
       };
       sections.Personal.sort = 20;
       sections.Finance.sort = 30;
+      sections.Development.sort = 40;
       sections.Networking.sort = 50;
       sections.Monitoring.sort = 60;
     };
     redis.enable = true;
     postgresql.enable = true;
     syncthing.enable = true;
+    forgejo.enable = true;
     immich.enable = true;
     imap-backup = {
       enable = true;

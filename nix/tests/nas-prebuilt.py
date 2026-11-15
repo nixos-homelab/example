@@ -1,4 +1,5 @@
 import json
+import shlex
 
 datasets = {
     "cluster": ["k3s", "data", "torrents", "usenet"],
@@ -157,7 +158,7 @@ with subtest("storage: the NFS exports admit loopback only"):
 
 with subtest("apps: postgresql has generated passwords from Secrets, the apps use them, the superuser's re-set at every start"):
     pg = "k3s kubectl -n postgresql"
-    users = ["ghostfolio", "grafana", "immich"]
+    users = ["forgejo", "ghostfolio", "grafana", "immich"]
     for ns in ["postgresql", *users]:
         nas.wait_until_succeeds(f"k3s kubectl get namespace {ns}", timeout=600)
     # The prebuilt VM doesn't enable setup-secrets' activation and service; the NAS runs this on every deploy
@@ -322,6 +323,41 @@ with subtest("apps: every workload rolls out with Ready pods, every HTTPRoute is
             f" $(k3s kubectl -n {ns} get pods -l job-name={name} --sort-by=.metadata.creationTimestamp -o name | tail -1) >&2"
         )
     assert not failed, f"Jobs that didn't complete: {sorted(failed)}"
+
+with subtest("development: Forgejo's admin logs in, a repo takes pushes over HTTP and over SSH on its Gateway's port 22"):
+    fj = "k3s kubectl -n forgejo"
+    password = nas.succeed(f"{fj} get secret forgejo-secrets -o jsonpath='{{.data.ADMIN_PASSWORD}}' | base64 -d")
+    # Over HTTP to the Service: in the VM Envoy answers every request through a Gateway with 403 (Cilium denies it)
+    web = nas.succeed(f"{fj} get svc forgejo -o jsonpath='{{.spec.clusterIP}}'").strip() + ":3000"
+    curl = f"curl -sf -u forgejo-admin:{password} -H 'Content-Type: application/json'"
+    api = f"http://{web}/api/v1"
+    assert json.loads(nas.succeed(f"{curl} {api}/user"))["login"] == "forgejo-admin"
+    nas.succeed(f"{curl} -X POST -d '{{\"name\":\"test\"}}' {api}/user/repos")
+    git = "git -C /tmp/repo -c user.name=test -c user.email=test@example.org"
+
+    def pushed(_):
+        """Whether the forge's main is the local HEAD, which it records after the push returns"""
+        status, branch = nas.execute(f"{curl} {api}/repos/forgejo-admin/test/branches/main")
+        head = nas.succeed(f"{git} rev-parse HEAD").strip()
+        return status == 0 and json.loads(branch)["commit"]["id"] == head
+
+    nas.succeed(
+        f"git init -q -b main /tmp/repo && {git} commit -q --allow-empty -m http"
+        f" && {git} push -q http://forgejo-admin:{password}@{web}/forgejo-admin/test.git main"
+    )
+    retry(pushed, timeout_seconds=60)
+    # The TCPRoute: Cilium balances port 22 of the Gateway's address to the built-in SSH server, past Envoy
+    addresses = nas.succeed(f"{fj} get gateway forgejo -o jsonpath='{{.status.addresses[*].value}}'").split()
+    ip = next(a for a in addresses if ":" not in a)
+    nas.succeed("ssh-keygen -q -t ed25519 -N '' -f /tmp/forgejo-ssh")
+    key = json.dumps({"title": "test", "key": nas.succeed("cat /tmp/forgejo-ssh.pub").strip()})
+    nas.succeed(f"{curl} -X POST -d {shlex.quote(key)} {api}/user/keys")
+    ssh = "ssh -i /tmp/forgejo-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    nas.succeed(
+        f"{git} commit -q --allow-empty -m ssh"
+        f" && GIT_SSH_COMMAND='{ssh}' {git} push -q git@{ip}:forgejo-admin/test.git main"
+    )
+    retry(pushed, timeout_seconds=60)
 
 with subtest("k3s: its bundled metrics-server answers the metrics API and takes pods with its egress label"):
     nas.succeed(

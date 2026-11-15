@@ -2,8 +2,8 @@
 
 An example NixOS configuration for a NAS that runs the
 [nixos-homelab](https://github.com/nixos-homelab) modules on a single-node k3s
-cluster: media, monitoring, finance and personal apps, with ZFS storage and
-WireGuard VPNs.
+cluster: media, monitoring, finance and personal apps and a Git forge, with ZFS
+storage and WireGuard VPNs.
 
 Every parameter is a placeholder (`example.org`, documentation IP ranges,
 all-zero WireGuard keys, an SSH key nobody holds), so it evaluates and runs in
