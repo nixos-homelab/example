@@ -158,7 +158,8 @@ with subtest("storage: the NFS exports admit loopback only"):
 
 with subtest("apps: postgresql has generated passwords from Secrets, the apps use them, the superuser's re-set at every start"):
     pg = "k3s kubectl -n postgresql"
-    users = ["forgejo", "ghostfolio", "grafana", "immich", "prowlarr", "radarr", "sonarr"]
+    # Grafana's is off with the monitoring stack, see nas-prebuilt.nix
+    users = ["forgejo", "ghostfolio", "immich", "prowlarr", "radarr", "sonarr"]
     # Each with a second database of the same user, for its log
     servarr = ["prowlarr", "radarr", "sonarr"]
     for ns in ["postgresql", *users]:
@@ -223,7 +224,7 @@ with subtest("apps: postgresql has generated passwords from Secrets, the apps us
                 f"{pg} exec deploy/postgresql -- psql -h /run/postgresql -U postgres -d {db} -tAc"
                 " 'SELECT 1 FROM \"VersionInfo\" LIMIT 1' | grep -qx 1"
             )
-    nas.succeed(f"{pg} create job backup-test --from=cronjob/backup-grafana-db")
+    nas.succeed(f"{pg} create job backup-test --from=cronjob/backup-forgejo-db")
     nas.wait_until_succeeds(f"{pg} wait job/backup-test --for=condition=Complete --timeout=10s", timeout=300)
 
     # An existing data dir keeps initdb's password; the restart has to set the Secret's
