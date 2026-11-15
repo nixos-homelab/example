@@ -2,6 +2,8 @@
 let
   client = {
     nixpkgs.hostPlatform = hostPkgs.stdenv.hostPlatform.system;
+    # netcat is all they run
+    virtualisation.memorySize = 512;
     environment.systemPackages = [ hostPkgs.netcat ];
   };
 in
@@ -14,6 +16,16 @@ in
   nodes.nas.virtualisation.qemu.options = [
     "-smp $(n=$(${hostPkgs.coreutils}/bin/nproc); echo $((n < 8 ? n : 8)))"
   ];
+  # The monitoring stack (Alloy, Mimir, the exporters, Grafana, which doesn't start without them) doubled the suite's
+  # time on a public runner's 4 CPUs, past an hour; monitoring is the repo to test it
+  nodes.nas.homelab = {
+    alloy.enable = lib.mkForce false;
+    grafana.enable = lib.mkForce false;
+    mimir.enable = lib.mkForce false;
+    node-exporter.enable = lib.mkForce false;
+    smartctl-exporter.enable = lib.mkForce false;
+    zfs-exporter.enable = lib.mkForce false;
+  };
   # A client of the forge for the Forgejo subtest
   nodes.nas.environment.systemPackages = [ hostPkgs.git ];
   # The disks of the pools last only as long as the test, so QEMU skips the flushes of ZFS and containerd

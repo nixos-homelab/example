@@ -148,6 +148,23 @@
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
     };
+    # The docs site in the cluster. nix-docs is `docs` here
+    homelab-docs = {
+      url = "github:nixos-homelab/docs";
+      inputs.systems.follows = "systems";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+      inputs.devshell.follows = "devshell";
+      inputs.docs.follows = "docs";
+      inputs.homelab-shared.follows = "homelab-shared";
+      inputs.homelab-storage.follows = "homelab-storage";
+      inputs.homelab-media.follows = "homelab-media";
+      inputs.homelab-monitoring.follows = "homelab-monitoring";
+      inputs.homelab-finance.follows = "homelab-finance";
+      inputs.homelab-networking.follows = "homelab-networking";
+      inputs.homelab-personal.follows = "homelab-personal";
+      inputs.homelab-development.follows = "homelab-development";
+    };
     setup-secrets = {
       url = "github:andsens/nixos-setup-secrets";
       inputs.systems.follows = "systems";

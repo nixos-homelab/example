@@ -158,7 +158,8 @@ with subtest("storage: the NFS exports admit loopback only"):
 
 with subtest("apps: postgresql has generated passwords from Secrets, the apps use them, the superuser's re-set at every start"):
     pg = "k3s kubectl -n postgresql"
-    users = ["forgejo", "ghostfolio", "grafana", "immich", "prowlarr", "radarr", "sonarr"]
+    # Grafana's is off with the monitoring stack, see nas-prebuilt.nix
+    users = ["forgejo", "ghostfolio", "immich", "prowlarr", "radarr", "sonarr"]
     # Each with a second database of the same user, for its log
     servarr = ["prowlarr", "radarr", "sonarr"]
     for ns in ["postgresql", *users]:
@@ -177,7 +178,10 @@ with subtest("apps: postgresql has generated passwords from Secrets, the apps us
         # The consumer's copy in its own namespace
         theirs = secret.format(user, "postgresql-password")
         nas.succeed(f"cmp <({secret.format('postgresql', user + '-password')}) <({theirs})")
-    nas.wait_until_succeeds(f"{pg} rollout status deploy/postgresql --timeout=10s", timeout=600)
+    # Available, not `rollout status`: the pods waited for the Secrets setup-secrets makes above, which on a slow host
+    # comes after the Deployments' 10 minutes of progress deadline, and past that `rollout status` only fails
+    available = "wait deploy/{} --for=condition=Available --timeout=10s"
+    nas.wait_until_succeeds(f"{pg} {available.format('postgresql')}", timeout=600)
     # initdb's fallback of 20 connections and 400kB of buffers starves a fresh immich's index builds
     settings = nas.succeed(
         f"{pg} exec deploy/postgresql -- psql -h /run/postgresql -U postgres -tAc"
@@ -205,7 +209,7 @@ with subtest("apps: postgresql has generated passwords from Secrets, the apps us
     # The apps log in with their copy of the password
     for user in users:
         try:
-            nas.wait_until_succeeds(f"k3s kubectl -n {user} rollout status deploy/{user} --timeout=10s", timeout=900)
+            nas.wait_until_succeeds(f"k3s kubectl -n {user} {available.format(user)}", timeout=900)
         except Exception:
             nas.execute(
                 f"k3s kubectl -n {user} describe pods | tail -40 >&2;"
@@ -220,7 +224,7 @@ with subtest("apps: postgresql has generated passwords from Secrets, the apps us
                 f"{pg} exec deploy/postgresql -- psql -h /run/postgresql -U postgres -d {db} -tAc"
                 " 'SELECT 1 FROM \"VersionInfo\" LIMIT 1' | grep -qx 1"
             )
-    nas.succeed(f"{pg} create job backup-test --from=cronjob/backup-grafana-db")
+    nas.succeed(f"{pg} create job backup-test --from=cronjob/backup-forgejo-db")
     nas.wait_until_succeeds(f"{pg} wait job/backup-test --for=condition=Complete --timeout=10s", timeout=300)
 
     # An existing data dir keeps initdb's password; the restart has to set the Secret's
@@ -237,6 +241,48 @@ with subtest("apps: postgresql has generated passwords from Secrets, the apps us
     assert socks, "no postgresql socket under /var/lib/kubelet/pods"
     for sock in socks:
         nas.fail(f"su -s /bin/sh admin -c 'test -e {sock}'")
+
+with subtest("apps: docs serves the site with the system's values to pods with cluster egress, and no other pod"):
+    nas.wait_until_succeeds("k3s kubectl -n docs get certificate docs", timeout=600)
+    # Its certificate comes from ACME, which the VM can't reach: a self-signed issuer stands in
+    nas.succeed(
+        "k3s kubectl apply -f - <<'EOF'\n"
+        "apiVersion: cert-manager.io/v1\nkind: ClusterIssuer\nmetadata: {name: selfsigned}\nspec: {selfSigned: {}}\n"
+        "EOF"
+    )
+    nas.succeed(
+        "k3s kubectl -n docs patch certificate docs --type=merge -p '{\"spec\":{\"issuerRef\":{\"name\":\"selfsigned\"}}}'"
+    )
+    nas.wait_until_succeeds("k3s kubectl -n docs get secret docs-tls", timeout=300)
+    nas.wait_until_succeeds("k3s kubectl -n docs rollout status deploy/docs --timeout=10s", timeout=600)
+    ip = nas.wait_until_succeeds(
+        "k3s kubectl -n docs get svc docs-external -o jsonpath='{.status.loadBalancer.ingress[0].ip}' | grep .",
+        timeout=120,
+    ).strip()
+    # awk reads crictl's output to the end: an early exit would kill crictl with SIGPIPE, and pipefail fail the command
+    utils = nas.succeed(
+        "k3s crictl images | awk '$1 == \"cluster.local/utils\" && !found { print $1 \":\" $2; found = 1 }'"
+    ).strip()
+    assert utils, "no cluster.local/utils image"
+    probe = "trap exit TERM; sleep 600 & wait"
+    nas.succeed(
+        f"k3s kubectl -n default run docs-probe --image={utils} --image-pull-policy=Never"
+        f" --labels=cluster.local/cluster-egress=allow --command -- bash -c '{probe}'"
+    )
+    nas.succeed(f"k3s kubectl -n default run docs-stranger --image={utils} --image-pull-policy=Never --command -- bash -c '{probe}'")
+    nas.wait_until_succeeds(
+        "k3s kubectl -n default wait pod/docs-probe pod/docs-stranger --for=condition=Ready --timeout=10s", timeout=120
+    )
+    # The domain is set on this system, so its row carries the value, marked changed
+    page = nas.wait_until_succeeds(
+        f"k3s kubectl -n default exec docs-probe -- curl -sfk -m 10 https://{ip}/shared/options/workloads/", timeout=60
+    )
+    row = page[page.index('id="homelab.workloads.domain"'):]
+    # Cell values carry break points (<wbr>) at their dots
+    row = row[: row.index("</tr>")].replace("<wbr>", "")
+    assert "nd-value nd-changed" in row and "example.org" in row, row
+    nas.fail(f"k3s kubectl -n default exec docs-stranger -- curl -sfk -m 5 https://{ip}/")
+    nas.succeed("k3s kubectl -n default delete pod docs-probe docs-stranger --wait=false")
 
 with subtest("apps: every workload rolls out with Ready pods, every HTTPRoute is accepted with a backend that answers"):
     # Workloads that can't come up in the VM, and why
@@ -457,15 +503,15 @@ with subtest("k3s: the boot removes a manifest left behind before k3s starts, th
     nas.fail("k3s kubectl -n kube-system get addon prune-test-boot")
     nas.wait_until_fails("k3s kubectl -n default get configmap prune-test-boot", timeout=60)
 
-with subtest("k3s: the boot imports no image again, the pods start from the images containerd keeps"):
+with subtest("k3s: the boot imports no image again, containerd keeps every image k3s skipped"):
     # The first start imported the links and kept them in its cache
     nas.succeed("journalctl -b -1 -u k3s | grep -q 'Imported [0-9]* images from'")
     nas.fail("journalctl -b -u k3s | grep -q 'Importing images from'")
-    # containerd still has every image of the links k3s skipped, and pods start from them
+    # containerd still has every image of the links k3s skipped. Waiting for a pod to start from them would wait for the
+    # whole cluster to converge again after the reboot, minutes on a CI runner
     cache = json.loads(nas.succeed("cat /mnt/cluster/k3s/agent/images/.cache.json"))
     images = json.loads(nas.succeed("k3s crictl images -o json"))["images"]
     tags = {tag for image in images for tag in image.get("repoTags") or []}
     missing = {name for entry in cache.values() for name in entry["images"]} - tags
     assert not missing, sorted(missing)
-    nas.succeed("k3s kubectl -n postgresql rollout status deploy/postgresql --timeout=300s")
 
