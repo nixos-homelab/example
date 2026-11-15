@@ -80,8 +80,9 @@ with subtest("networking: NodePorts are served on the LAN's addresses only, not 
     nas.wait_until_succeeds(f"{addresses} | grep privacy-vpn >/dev/null", timeout=120)
     nas.succeed(f"{addresses} | {nodeport} | grep -x eth1 >/dev/null")
     nas.fail(f"{addresses} | {nodeport} | grep -x privacy-vpn >/dev/null")
-    # The NodePort of k8sss, which answers once step-ca is Ready; nothing above waits for that
-    lan.wait_until_succeeds(f"nc -z -w 2 {ip} 9000", timeout=180)
+    # The NodePort of k8sss, which answers once step-ca is Ready; nothing above waits for that, and this early in the
+    # suite the cluster is still coming up: minutes on a public runner
+    lan.wait_until_succeeds(f"nc -z -w 2 {ip} 9000", timeout=900)
 
 with subtest("storage: the NFS exports admit loopback only"):
     # A mount of its own eth1 address comes from that address and never meets the host firewall
