@@ -158,7 +158,9 @@ with subtest("storage: the NFS exports admit loopback only"):
 
 with subtest("apps: postgresql has generated passwords from Secrets, the apps use them, the superuser's re-set at every start"):
     pg = "k3s kubectl -n postgresql"
-    users = ["forgejo", "ghostfolio", "grafana", "immich"]
+    users = ["forgejo", "ghostfolio", "grafana", "immich", "prowlarr", "radarr", "sonarr"]
+    # Each with a second database of the same user, for its log
+    servarr = ["prowlarr", "radarr", "sonarr"]
     for ns in ["postgresql", *users]:
         nas.wait_until_succeeds(f"k3s kubectl get namespace {ns}", timeout=600)
     # The prebuilt VM doesn't enable setup-secrets' activation and service; the NAS runs this on every deploy
@@ -182,8 +184,8 @@ with subtest("apps: postgresql has generated passwords from Secrets, the apps us
         " \"SELECT current_setting('shared_buffers') || ' ' || current_setting('max_connections')\""
     ).strip()
     assert settings == "128MB 100", settings
-    for user in users:
-        nas.wait_until_succeeds(f"{pg} wait job/create-{user}-db --for=condition=Complete --timeout=10s", timeout=600)
+    for db in users + [f"{app}-log" for app in servarr]:
+        nas.wait_until_succeeds(f"{pg} wait job/create-{db}-db --for=condition=Complete --timeout=10s", timeout=600)
 
     def login(user, password_cmd):
         """Logs in over TCP to the pod's IP, which pg_hba sends to password authentication"""
@@ -211,6 +213,13 @@ with subtest("apps: postgresql has generated passwords from Secrets, the apps us
                 f" k3s kubectl -n {user} logs deploy/{user} --all-containers --tail=60 >&2"
             )
             raise
+    # Both databases of each app hold its schema, the log database a hyphen in its name
+    for app in servarr:
+        for db in [app, f"{app}-log"]:
+            nas.succeed(
+                f"{pg} exec deploy/postgresql -- psql -h /run/postgresql -U postgres -d {db} -tAc"
+                " 'SELECT 1 FROM \"VersionInfo\" LIMIT 1' | grep -qx 1"
+            )
     nas.succeed(f"{pg} create job backup-test --from=cronjob/backup-grafana-db")
     nas.wait_until_succeeds(f"{pg} wait job/backup-test --for=condition=Complete --timeout=10s", timeout=300)
 
