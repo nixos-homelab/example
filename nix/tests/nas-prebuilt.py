@@ -91,7 +91,8 @@ with subtest("storage: the NFS exports admit loopback only"):
 
 with subtest("apps: the apps get their PostgreSQL passwords and databases, log in and hold their schemas"):
     pg = "k3s kubectl -n postgresql"
-    users = ["forgejo", "ghostfolio", "grafana", "immich", "prowlarr", "radarr", "sonarr"]
+    # Grafana's is off with the monitoring stack, see nas-prebuilt.nix
+    users = ["forgejo", "ghostfolio", "immich", "prowlarr", "radarr", "sonarr"]
     # Each with a second database of the same user, for its log
     servarr = ["prowlarr", "radarr", "sonarr"]
     for ns in ["postgresql", *users]:
