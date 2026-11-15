@@ -74,6 +74,7 @@
       inputs.homelab-shared.follows = "homelab-shared";
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
+      inputs.homelab-monitoring.follows = "homelab-monitoring";
     };
     homelab-media = {
       url = "github:nixos-homelab/media";
@@ -119,6 +120,7 @@
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
       inputs.nixhelm.follows = "nixhelm";
+      inputs.homelab-monitoring.follows = "homelab-monitoring";
     };
     homelab-personal = {
       url = "github:nixos-homelab/personal";

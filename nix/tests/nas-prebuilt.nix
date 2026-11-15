@@ -16,10 +16,6 @@ in
   nodes.nas.virtualisation.qemu.options = [
     "-smp $(n=$(${hostPkgs.coreutils}/bin/nproc); n=$((n > 1 ? n - 1 : 1)); echo $((n < 8 ? n : 8)))"
   ];
-  # Memory the guest has touched stays with QEMU: the NAS's 8 GiB beside the clients ran a public runner (16 GB) out of
-  # memory, and 6 GiB is too little for its workloads (Cilium went to the OOM killer). Fixed, as virtiofsd shares the
-  # guest's memory through a backend of this size, which a -m can't change
-  nodes.nas.virtualisation.memorySize = lib.mkForce 7168;
   # A client of the forge for the Forgejo subtest
   nodes.nas.environment.systemPackages = [ hostPkgs.git ];
   # The disks of the pools last only as long as the test, so QEMU skips the flushes of ZFS and containerd
@@ -35,29 +31,7 @@ in
       }
     )
   ];
-  # Manifests that a later generation no longer has, which the k3s subtests link into k3s' manifests directory. The
-  # first also declares an object of a manifest k3s bundles, as one that moved to a remaining manifest
-  nodes.nas.environment.etc."k3s-prune-test/prune-test.yaml".text = ''
-    apiVersion: v1
-    kind: ConfigMap
-    metadata: {name: prune-test, namespace: default}
-    ---
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRoleBinding
-    metadata: {name: kube-apiserver-kubelet-admin}
-    roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: "system:kubelet-api-admin"}
-    subjects: [{apiGroup: rbac.authorization.k8s.io, kind: User, name: kube-apiserver}]
-  '';
-  nodes.nas.environment.etc."k3s-prune-test/prune-test-boot.yaml".text = ''
-    apiVersion: v1
-    kind: ConfigMap
-    metadata: {name: prune-test-boot, namespace: default}
-  '';
-  nodes.lan = lib.mkMerge [
-    client
-    # For the pods allowed to reach the LAN
-    { networking.firewall.allowedTCPPorts = [ 8000 ]; }
-  ];
+  nodes.lan = client;
   nodes.outside = lib.mkMerge [
     client
     {
