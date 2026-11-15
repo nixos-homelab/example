@@ -64,6 +64,7 @@
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
       inputs.nixhelm.follows = "nixhelm";
+      inputs.homelab-monitoring.follows = "homelab-monitoring";
     };
     homelab-storage = {
       url = "github:nixos-homelab/storage";
@@ -87,6 +88,7 @@
       inputs.homelab-networking.follows = "homelab-networking";
       inputs.homelab-storage.follows = "homelab-storage";
       inputs.docs.follows = "docs";
+      inputs.homelab-monitoring.follows = "homelab-monitoring";
     };
     homelab-monitoring = {
       url = "github:nixos-homelab/monitoring";
@@ -109,6 +111,7 @@
       inputs.homelab-storage.follows = "homelab-storage";
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
+      inputs.homelab-monitoring.follows = "homelab-monitoring";
     };
     homelab-networking = {
       url = "github:nixos-homelab/networking";
@@ -132,6 +135,7 @@
       inputs.homelab-storage.follows = "homelab-storage";
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
+      inputs.homelab-monitoring.follows = "homelab-monitoring";
     };
     homelab-development = {
       url = "github:nixos-homelab/development";
