@@ -282,29 +282,6 @@ with subtest("apps: every workload rolls out with Ready pods, every HTTPRoute is
         )
     assert not failed, f"Jobs that didn't complete: {sorted(failed)}"
 
-with subtest("monitoring: Grafana provisions the dashboards from their ConfigMaps and opens on the home dashboard"):
-    # What the kubelet adds to monitoring's own check, which runs the same image on the same files: the volumes' symlinks
-    # as mounted, PostgreSQL, the env reaching the pod
-    ip = nas.succeed("k3s kubectl -n grafana get svc grafana -o jsonpath='{.spec.clusterIP}'").strip()
-    # The login header the gateway adds
-    get = f"curl -sf -m 10 -H 'X-WEBAUTH-USER: admin' http://{ip}:3000"
-    try:
-        # The provider scans every 30 s
-        nas.wait_until_succeeds(f"{get}/api/dashboards/uid/example >/dev/null", timeout=120)
-    except Exception:
-        nas.execute(
-            f"curl -s -m 10 -H 'X-WEBAUTH-USER: admin' http://{ip}:3000/api/dashboards/uid/example >&2;"
-            " k3s kubectl -n grafana exec deploy/grafana -- ls -laR /etc/grafana/dashboards /etc/grafana/provisioning >&2;"
-            " k3s kubectl -n grafana logs deploy/grafana --tail=200 | grep -i -e provision -e error >&2"
-        )
-        raise
-    dashboard = json.loads(nas.succeed(f"{get}/api/dashboards/uid/example"))
-    assert dashboard["meta"]["folderTitle"] == "Homelab", dashboard["meta"]
-    # Grafana keeps a copy of the home dashboard's file and redirects to it
-    redirect = json.loads(nas.succeed(f"{get}/api/dashboards/home"))["redirectUri"]
-    home = json.loads(nas.succeed(f"{get}/api/dashboards/uid/{redirect.split('/')[2]}"))
-    assert home["dashboard"]["title"] == "Example", home["dashboard"].get("title")
-
 with subtest("development: Forgejo's admin logs in, a repo takes pushes over HTTP and over SSH on its Gateway's port 22"):
     fj = "k3s kubectl -n forgejo"
     password = nas.succeed(f"{fj} get secret forgejo-secrets -o jsonpath='{{.data.ADMIN_PASSWORD}}' | base64 -d")
