@@ -79,6 +79,35 @@ in
           };
           installer-iso = configs.iso.config.sbfde.installer.isoImage;
         };
+        # Screenshots of the NAS dashboards on generated samples: nix build .#screenshots.<dashboard>[.<scenario>],
+        # and the Workload dashboard of each app with a row of its own as workload-<app>
+        legacyPackages.screenshots = inputs.homelab-monitoring.lib.screenshots.forDashboards {
+          inherit pkgs;
+          inherit (nas.homelab.grafana) dashboards;
+          variants =
+            lib.genAttrs'
+              [
+                "client-vpn"
+                "immich"
+                "k8sss"
+                "plex"
+                "postgresql"
+                "prowlarr"
+                "radarr"
+                "redis"
+                "rtorrent"
+                "sabnzbd"
+                "sonarr"
+                "unifi"
+              ]
+              (
+                app:
+                lib.nameValuePair "workload-${app}" {
+                  dashboard = "workload";
+                  variables.workload = app;
+                }
+              );
+        };
         # Dead Nix code. Pattern names stay: modules take { config, lib, pkgs, ... } whether they use them or not
         checks.deadnix = pkgs.runCommand "deadnix" { nativeBuildInputs = [ pkgs.deadnix ]; } ''
           deadnix --fail --no-lambda-pattern-names ${self}
