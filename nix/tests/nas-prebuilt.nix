@@ -16,11 +16,12 @@ in
   nodes.nas.virtualisation.qemu.options = [
     "-smp $(n=$(${hostPkgs.coreutils}/bin/nproc); echo $((n < 8 ? n : 8)))"
   ];
-  # The monitoring stack (Alloy, Mimir, the exporters, Grafana, which doesn't start without them) doubled the suite's
+  # The monitoring stack (Alloy, Loki, Mimir, the exporters, Grafana, which doesn't start without them) doubled the suite's
   # time on a public runner's 4 CPUs, past an hour; monitoring is the repo to test it
   nodes.nas.homelab = {
     alloy.enable = lib.mkForce false;
     grafana.enable = lib.mkForce false;
+    loki.enable = lib.mkForce false;
     mimir.enable = lib.mkForce false;
     node-exporter.enable = lib.mkForce false;
     smartctl-exporter.enable = lib.mkForce false;

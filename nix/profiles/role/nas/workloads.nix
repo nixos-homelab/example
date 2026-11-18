@@ -24,6 +24,7 @@ in
     inputs.homelab-media.nixosModules.sonarr
     inputs.homelab-monitoring.nixosModules.alloy
     inputs.homelab-monitoring.nixosModules.grafana
+    inputs.homelab-monitoring.nixosModules.loki
     inputs.homelab-monitoring.nixosModules.node-exporter
     inputs.homelab-monitoring.nixosModules.mimir
     inputs.homelab-monitoring.nixosModules.smartctl-exporter
@@ -108,6 +109,7 @@ in
     };
     prowlarr.enable = true;
     mimir.enable = true;
+    loki.enable = true;
     grafana = {
       enable = true;
       # A dashboard of your own, written with the builders of homelab-monitoring's lib.grafana
