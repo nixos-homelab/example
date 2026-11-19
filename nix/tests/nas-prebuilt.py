@@ -58,8 +58,9 @@ with subtest("networking: the host firewall opens the global ports to the LAN on
     lan.wait_until_succeeds(f"nc -z -w 2 {ip} 6443", timeout=600)
     lan.succeed(f"nc -z -w 2 {ip} 22")
     outside.wait_until_succeeds(f"ping -c 1 -W 1 {ip}", timeout=60)
-    # Cilium's host policy narrows the ports to the LAN once it's enforced; the NixOS firewall alone opens them to all
-    outside.wait_until_fails(f"nc -z -w 2 {ip} 6443", timeout=120)
+    # Cilium's host policy narrows the ports to the LAN once it's enforced; the NixOS firewall alone opens them to all.
+    # On a public runner k3s may still be applying the manifests minutes after the LAN gets through
+    outside.wait_until_fails(f"nc -z -w 2 {ip} 6443", timeout=600)
     outside.fail(f"nc -z -w 2 {ip} 22")
     # rtorrent's port on privacy-vpn, open to any source; nothing listens on it in the VM
     nas.succeed("k3s kubectl get ccnp host-firewall -o jsonpath='{.spec.ingress[2].toPorts[0].ports[0].port}' | grep -qx 6881")
