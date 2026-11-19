@@ -68,5 +68,9 @@ in
       ];
     };
     systemd.services.nfs-server.before = [ "remote-fs-pre.target" ];
+    # LOCALIO is on (the kernel default): these loopback mounts skip RPC and write straight into nfsd. On 2026-11-19 one
+    # of four VM suite runs on 6.18.63 oopsed in nfs_local_call_write+0x141 (workqueue nfslocaliod, NULL inode) and hung
+    # in the panic (nixos-homelab/example run 44606619318, attempt 1). Left on after that one occurrence; if it comes
+    # back, turn it off with: boot.extraModprobeConfig = "options nfs localio_enabled=N";
   };
 }

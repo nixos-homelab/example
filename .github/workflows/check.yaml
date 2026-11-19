@@ -69,9 +69,11 @@ jobs:
     # Everything not from cache.nixos.org, without the upstream image archives (fetched again from their registries)
     # and the disk image of the VM, which would take most of the 10 GB GitHub keeps per repository
     # The Nix daemon, which runs as root, makes the directory when it opens the substituter
+    # Only runs on main save it: one cache is about all the 10 GB hold, and a pull request's would evict main's, which
+    # every branch reads, so the next run builds everything again
     - name: Fill the Nix cache
       id: fill
-      if: ${{ !cancelled() }}
+      if: ${{ !cancelled() && github.event_name == 'push' }}
       run: |
         sudo rm -rf /home/runner/nix-cache
         nix path-info --all --json |
