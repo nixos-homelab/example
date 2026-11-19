@@ -90,9 +90,15 @@ with subtest("storage: the NFS exports admit loopback only"):
     nas.succeed("mkdir -p /tmp/nfs && mount -t nfs 127.0.0.2:/mnt/cluster/data /tmp/nfs && umount /tmp/nfs")
     nas.fail(f"timeout 60 mount -t nfs {ip}:/mnt/cluster/data /tmp/nfs")
 
-def setup_secrets():
-    """setup-secrets --auto, failing on anything but what Plex being down explains: its API key comes from the
-    workload, which never becomes available here (see expected_down), and the destinations that need it"""
+# Plex never becomes available here (see expected_down), so its API key, read from the workload, can't be fetched
+PLEX_KEY = frozenset({"PLEX_API_KEY"})
+# The servarr apps wait for their databases, which the first runs make, so their keys may not be readable yet
+SERVARR_KEYS = frozenset({"PROWLARR_API_KEY", "RADARR_API_KEY", "SABNZBD_API_KEY", "SONARR_API_KEY"})
+
+
+def setup_secrets(waiting_for=PLEX_KEY):
+    """setup-secrets --auto, failing on anything but secrets in waiting_for that couldn't be fetched, and the
+    destinations skipped for them; a destination whose own command fails always fails"""
     status, out = nas.execute("setup-secrets --auto 2>&1")
     if status == 0:
         return
@@ -100,10 +106,12 @@ def setup_secrets():
     assert failed, out
     fetching = set(filter(None, (failed["fetching"] or "").split(", ")))
     storing = set(filter(None, (failed["storing"] or "").split(", ")))
-    assert fetching <= {"PLEX_API_KEY"}, f"setup-secrets failed fetching {sorted(fetching)}:\n{out}"
-    assert storing <= {"Plex API key", "Homepage (PLEX_API_KEY)", "Plex integration keys"}, (
-        f"setup-secrets failed storing {sorted(storing)}:\n{out}"
-    )
+    assert fetching <= waiting_for, f"setup-secrets failed fetching {sorted(fetching - waiting_for)}:\n{out}"
+    for dest in storing:
+        skipped_for = set(re.findall(rf'^{re.escape(dest)}: No value for required secret "(\w+)", skipping$', out, re.M))
+        assert skipped_for and skipped_for <= waiting_for and f"{dest}: Storing secret failed" not in out, (
+            f"setup-secrets failed storing {dest}:\n{out}"
+        )
 
 
 with subtest("apps: the apps get their PostgreSQL passwords and databases, log in and hold their schemas"):
@@ -115,13 +123,13 @@ with subtest("apps: the apps get their PostgreSQL passwords and databases, log i
     for ns in ["postgresql", *users]:
         nas.wait_until_succeeds(f"k3s kubectl get namespace {ns}", timeout=600)
     # The prebuilt VM doesn't enable setup-secrets' units; the NAS runs them on every deploy and boot
-    setup_secrets()
+    setup_secrets(PLEX_KEY | SERVARR_KEYS)
     secret = "k3s kubectl -n {} get secret {} -o jsonpath='{{.data.password}}' | base64 -d"
     first = nas.succeed(secret.format("postgresql", "postgres-password"))
     jwt = "k3s kubectl -n ghostfolio get secret ghostfolio-secrets -o jsonpath='{.data.JWT_SECRET_KEY}'"
     first_jwt = nas.succeed(jwt)
     assert first_jwt, "setup-secrets generated no ghostfolio-secrets"
-    setup_secrets()
+    setup_secrets(PLEX_KEY | SERVARR_KEYS)
     assert nas.succeed(secret.format("postgresql", "postgres-password")) == first, "setup-secrets replaced a password"
     assert nas.succeed(jwt) == first_jwt, "setup-secrets replaced ghostfolio's JWT secret"
     for user in users:
