@@ -1,11 +1,16 @@
-name: Dependabot auto-merge
+name: Auto-merge
 
-# Dependabot pull requests run with read-only default permissions, so this
-# needs its own workflow rather than a step tacked onto check.yaml - see
-# GitHub's docs on automating Dependabot:
+# Pull requests from Dependabot and from Claude sessions merge by themselves
+# once the required check passes. Dependabot pull requests run with read-only
+# default permissions, so this needs its own workflow rather than a step
+# tacked onto check.yaml - see GitHub's docs on automating Dependabot:
 # https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions
 
-on: pull_request
+on:
+  pull_request:
+    # ready_for_review on top of the defaults, so a draft starts auto-merge
+    # once it is marked ready
+    types: [opened, synchronize, reopened, ready_for_review]
 
 # Everything below runs under AUTOMERGE_TOKEN, so GITHUB_TOKEN needs nothing
 permissions: {}
@@ -14,13 +19,20 @@ jobs:
   auto-merge:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Dependabot has to have opened the pull request, and triggered this run:
-    # a push by anyone else (the lock job's included) triggers one as that
-    # user, which cannot read the token. Auto-merge enabled before then
-    # carries over.
+    # Either Dependabot opened the pull request and triggered this run, or a
+    # Claude session did: a non-draft pull request from a `claude/` branch of
+    # this repository (never a fork, which gets no secrets anyway), opened and
+    # pushed by andsens, the user whose token those sessions push with. A push
+    # by anyone else (the lock job's included) triggers a run as that user and
+    # is skipped; auto-merge enabled before then carries over.
     if: >-
-      github.event.pull_request.user.login == 'dependabot[bot]' &&
-      github.actor == 'dependabot[bot]'
+      (github.event.pull_request.user.login == 'dependabot[bot]' &&
+       github.actor == 'dependabot[bot]') ||
+      (startsWith(github.event.pull_request.head.ref, 'claude/') &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.user.login == 'andsens' &&
+       github.actor == 'andsens' &&
+       !github.event.pull_request.draft)
     steps:
     # This only *enables* GitHub's native auto-merge, which then waits for the
     # required status checks on whatever the head commit ends up being. That
@@ -28,11 +40,12 @@ jobs:
     # job from check.yaml required on main, or it is a no-op.
     #
     # The merge runs under a personal access token because GITHUB_TOKEN has no
-    # permission that covers workflow files, so it cannot merge the
-    # github-actions bumps. The token is the organization's Dependabot secret,
-    # since these runs cannot read Actions secrets: a fine-grained token on
-    # nixos-homelab with read and write on contents, pull requests and
-    # workflows.
+    # permission that covers workflow files, so it cannot merge changes to
+    # them, and a merge it makes starts no workflow runs on main. The token
+    # is a fine-grained one on nixos-homelab with read and write on contents,
+    # pull requests and workflows, set twice under the same name: as an
+    # organization Dependabot secret, the only kind Dependabot's runs can
+    # read, and as an organization Actions secret for everyone else's.
     - name: Enable auto-merge
       run: gh pr merge --auto --squash "$PR_URL"
       env:

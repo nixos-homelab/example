@@ -15,6 +15,9 @@ in
   nodes.nas.virtualisation.cores = lib.mkForce 4;
   nodes.nas.virtualisation.qemu.options = [
     "-smp $(n=$(${hostPkgs.coreutils}/bin/nproc); echo $((n < 8 ? n : 8)))"
+    # See the watchdog below
+    "-device i6300esb"
+    "-action watchdog=poweroff"
   ];
   # The monitoring stack (Alloy, Loki, Mimir, the exporters, Grafana, which doesn't start without them) doubled the suite's
   # time on a public runner's 4 CPUs, past an hour; monitoring is the repo to test it
@@ -27,6 +30,10 @@ in
     smartctl-exporter.enable = lib.mkForce false;
     zfs-exporter.enable = lib.mkForce false;
   };
+  # A guest that panics stops petting the watchdog and QEMU powers it off, which fails the test at once; without it the
+  # driver waits on the dead guest until the job's timeout
+  nodes.nas.boot.kernelModules = [ "i6300esb" ];
+  nodes.nas.systemd.settings.Manager.RuntimeWatchdogSec = "2min";
   # A client of the forge for the Forgejo subtest
   nodes.nas.environment.systemPackages = [ hostPkgs.git ];
   # The disks of the pools last only as long as the test, so QEMU skips the flushes of ZFS and containerd
