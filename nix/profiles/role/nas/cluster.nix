@@ -4,7 +4,7 @@
   ...
 }:
 let
-  inherit (inputs.homelab-shared.lib.setup-secrets) mkScript;
+  inherit (inputs.homelab-shared.lib.setup-secrets) kubeSecretSource kubeSecretDestination;
 in
 {
   # A single-node k3s cluster with step-ca for the users of the cluster, Let's Encrypt certificates and DNS records from external-dns,
@@ -52,39 +52,37 @@ in
       };
     # The INWX credentials, asked for once and stored in the cluster for both
     setup-secrets = {
-      sources.INWX_USERNAME = {
+      sources.INWX_USERNAME = kubeSecretSource pkgs {
         description = "INWX Username";
-        cmd = mkScript pkgs "getKubeSecret cert-manager inwx-credentials username";
+        namespace = "cert-manager";
+        name = "inwx-credentials";
+        field = "username";
       };
-      sources.INWX_PASSWORD = {
+      sources.INWX_PASSWORD = kubeSecretSource pkgs {
         description = "INWX Password";
-        cmd = mkScript pkgs "getKubeSecret cert-manager inwx-credentials password";
+        namespace = "cert-manager";
+        name = "inwx-credentials";
+        field = "password";
       };
       destinations = [
-        {
+        (kubeSecretDestination pkgs {
           logPrefix = "cert-manager (INWX Credentials)";
-          requires = [
-            "INWX_USERNAME"
-            "INWX_PASSWORD"
-          ];
-          cmd = mkScript pkgs ''
-            setKubeSecret cert-manager inwx-credentials \
-              username "''${INWX_USERNAME:?}" \
-              password "''${INWX_PASSWORD:?}"
-          '';
-        }
-        {
+          namespace = "cert-manager";
+          name = "inwx-credentials";
+          data = {
+            username = "INWX_USERNAME";
+            password = "INWX_PASSWORD";
+          };
+        })
+        (kubeSecretDestination pkgs {
           logPrefix = "external-dns (INWX Credentials)";
-          requires = [
-            "INWX_USERNAME"
-            "INWX_PASSWORD"
-          ];
-          cmd = mkScript pkgs ''
-            setKubeSecret external-dns inwx-credentials \
-              INWX_USERNAME "''${INWX_USERNAME:?}" \
-              INWX_PASSWORD "''${INWX_PASSWORD:?}"
-          '';
-        }
+          namespace = "external-dns";
+          name = "inwx-credentials";
+          data = {
+            INWX_USERNAME = "INWX_USERNAME";
+            INWX_PASSWORD = "INWX_PASSWORD";
+          };
+        })
       ];
     };
   };
