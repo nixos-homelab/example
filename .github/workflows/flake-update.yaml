@@ -1,0 +1,37 @@
+name: Flake update
+
+# What a consumer gets from a plain `nix flake update`: every input at its newest, nixpkgs and nixhelm among them,
+# with the homelab modules following this flake's. The modules must evaluate against inputs newer than their own
+# locks (a pinned version taken from an input a consumer overrides once broke this, see homelab-shared's
+# lib.pins.locked), so this updates the lock and evaluates every check, building only what evaluation imports.
+# Nothing is committed; Dependabot moves flake.lock
+on:
+  schedule:
+  - cron: '17 4 * * *'
+  pull_request:
+    paths: ['flake.nix', '.github/workflows/flake-update.yaml']
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - name: Install Nix
+      uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
+      with:
+        extra_nix_config: experimental-features = nix-command flakes
+    - name: Update the inputs
+      run: nix flake update
+    # As check.yaml evaluates: the checks' and packages' derivations, the Helm charts and other imports built on the way
+    - name: Evaluate the flake
+      run: |
+        nix eval --json .#. --apply 'flake: {
+          checks = map (check: check.drvPath) (builtins.attrValues flake.checks.x86_64-linux);
+          packages = map (package: package.drvPath) (builtins.attrValues flake.packages.x86_64-linux);
+        }'
