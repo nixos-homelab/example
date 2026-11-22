@@ -18,11 +18,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-parts.follows = "flake-parts";
     };
-    nixhelm = {
-      url = "github:nix-community/nixhelm";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.nix-kube-generators.follows = "kube-generators";
-    };
     devshell = {
       url = "github:numtide/devshell";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -63,7 +58,6 @@
       inputs.k8sss.follows = "k8sss";
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
-      inputs.nixhelm.follows = "nixhelm";
       inputs.homelab-monitoring.follows = "homelab-monitoring";
     };
     homelab-storage = {
@@ -122,7 +116,6 @@
       inputs.homelab-shared.follows = "homelab-shared";
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
-      inputs.nixhelm.follows = "nixhelm";
       inputs.homelab-monitoring.follows = "homelab-monitoring";
     };
     homelab-personal = {
