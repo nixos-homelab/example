@@ -6,12 +6,12 @@ updates:
     interval: cron
     # Twice a week, so the Nix cache in the Actions cache never goes 7 days without a restore
     cronjob: "0 4 * * 1,4"
-  # All homelab inputs in one PR: each homelab main is checked against the
-  # locks it has, so one moved alone can meet an older one it doesn't
-  # evaluate against
+  # The homelab inputs in one PR, with the ones they follow from here: each
+  # homelab main is checked against the locks it has, so one moved alone can
+  # meet an older one it doesn't evaluate against
   groups:
     homelab:
-      patterns: ["homelab-*"]
+      patterns: ["homelab-*", "setup-secrets", "k8sss", "kube-generators", "docs"]
 - package-ecosystem: github-actions
   directory: /
   schedule:
