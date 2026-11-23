@@ -637,11 +637,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794759401,
-        "narHash": "sha256-0nz4squUFoveVVutTMpW9KZnX4GpLUTK8jKfrGBMBuY=",
+        "lastModified": 1795063740,
+        "narHash": "sha256-SzeGUMUEgUB0g3L43cuL0P1CpmvGYwukwY485BWfHDE=",
         "owner": "andsens",
         "repo": "k8sss",
-        "rev": "244f383011413bcf1f9b590c9dcc32b51936f874",
+        "rev": "045f175c43c44e8847bd8ee308139be21ce6e3f2",
         "type": "github"
       },
       "original": {
