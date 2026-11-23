@@ -138,6 +138,7 @@
       inputs.setup-secrets.follows = "setup-secrets";
       inputs.homelab-shared.follows = "homelab-shared";
       inputs.homelab-storage.follows = "homelab-storage";
+      inputs.homelab-monitoring.follows = "homelab-monitoring";
       inputs.kube-generators.follows = "kube-generators";
       inputs.docs.follows = "docs";
     };

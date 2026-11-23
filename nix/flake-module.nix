@@ -108,6 +108,11 @@ in
                 }
               );
         };
+        # One lock node per homelab repo
+        checks.flake-lock = inputs.homelab-shared.lib.checks.flakeLock {
+          inherit pkgs;
+          lockFile = ../flake.lock;
+        };
         # Dead Nix code. Pattern names stay: modules take { config, lib, pkgs, ... } whether they use them or not
         checks.deadnix = pkgs.runCommand "deadnix" { nativeBuildInputs = [ pkgs.deadnix ]; } ''
           deadnix --fail --no-lambda-pattern-names ${self}
