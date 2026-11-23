@@ -856,11 +856,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1794398496,
-        "narHash": "sha256-GGRHVYzoJwJ3WoQ6Y2Dj+++GxewG6u/HvBi4E9sqexo=",
+        "lastModified": 1795003401,
+        "narHash": "sha256-5ZMxuQPJCakkoh2J+lgCZaoQEFp2AiASMMgslByZQXM=",
         "owner": "andsens",
         "repo": "nixos-sbfde",
-        "rev": "f9d88e3a70974699c050b78c029989f09e1b3d0e",
+        "rev": "a24acb24c75cfd0404c4da3c3bb6df4e6affe311",
         "type": "github"
       },
       "original": {
