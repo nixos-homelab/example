@@ -34,6 +34,12 @@ in
   # driver waits on the dead guest until the job's timeout
   nodes.nas.boot.kernelModules = [ "i6300esb" ];
   nodes.nas.systemd.settings.Manager.RuntimeWatchdogSec = "2min";
+  # Plex never becomes available in the VM, and the test expects its API key to fail. As configured, each setup-secrets
+  # run waits for its rollout 6 times over, about 10 minutes, before it gives up
+  nodes.nas.setup-secrets.sources.PLEX_API_KEY = {
+    retries = lib.mkForce 0;
+    timeout = lib.mkForce "10s";
+  };
   # A client of the forge for the Forgejo subtest
   nodes.nas.environment.systemPackages = [ hostPkgs.git ];
   # The disks of the pools last only as long as the test, so QEMU skips the flushes of ZFS and containerd
