@@ -78,14 +78,39 @@ jobs:
     - name: Fill the Nix cache
       id: fill
       if: ${{ !cancelled() && github.event_name == 'push' }}
+      # A run that substitutes the checks' outputs never puts what they're built from in the store, so a cache made only
+      # from the store loses it, and the next change builds it all again (k3s among it). The restored cache's entries of
+      # what the checks are built from carry over; the rest drops out
       run: |
-        sudo rm -rf /home/runner/nix-cache
+        cache=/home/runner/nix-cache
+        sudo rm -rf $cache.old
+        if [[ -d $cache ]]; then sudo mv $cache $cache.old; fi
         nix path-info --all --json |
           jq -r 'if type == "array" then .[] | [.path, .signatures] else to_entries[] | [.key, .value.signatures] end
             | select(any(.[1][]?; startswith("cache.nixos.org-")) | not) | .[0]' |
           grep -vE '\.drv$|-docker-image-.*\.tar$|-nixos-disk-image' |
-          xargs -r nix copy --to 'file:///home/runner/nix-cache?compression=zstd'
-        du -sh /home/runner/nix-cache
+          xargs -r nix copy --to "file://$cache?compression=zstd"
+        if [[ -d $cache.old ]]; then
+          # The store hashes of the outputs of every derivation the checks are built from (fixed-output ones carry no
+          # path, they are fetched again)
+          jq -r '.checks[]' outputs.json | xargs nix derivation show -r |
+            jq -r '.. | objects | .outputs? // empty | objects | .[] | .path? // empty' |
+            sed -E 's|.*/||; s/^(.{32}).*/\1/' | sort -u > needed.txt
+          kept=0
+          sudo mkdir -p $cache/nar
+          for narinfo in "$cache".old/*.narinfo; do
+            hash=$(basename "$narinfo" .narinfo)
+            [[ -e $cache/$hash.narinfo ]] && continue
+            grep -qxF "$hash" needed.txt || continue
+            nar=$(sed -n 's/^URL: //p' "$narinfo")
+            sudo cp "$narinfo" "$cache/"
+            sudo cp "$cache.old/$nar" "$cache/$nar"
+            kept=$((kept + 1))
+          done
+          echo "kept $kept paths of the restored cache"
+          sudo rm -rf $cache.old
+        fi
+        du -sh $cache
     - name: Save the Nix cache
       if: ${{ !cancelled() && steps.fill.outcome == 'success' }}
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
