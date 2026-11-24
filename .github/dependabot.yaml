@@ -1,18 +1,26 @@
 version: 2
+# Every upstream bump in one PR. The homelab inputs, and the inputs they
+# follow from here, are left to people: `bump` moves them at the top
+# (machines and example), and the repos between move a sibling only when a
+# change needs its new code
+multi-ecosystem-groups:
+  upstream:
+    schedule:
+      interval: cron
+      # Twice a week, so the Nix cache in the Actions cache never goes 7 days without a restore
+      cronjob: "0 4 * * 1,4"
 updates:
 - package-ecosystem: nix
   directory: /
-  schedule:
-    interval: cron
-    # Twice a week, so the Nix cache in the Actions cache never goes 7 days without a restore
-    cronjob: "0 4 * * 1,4"
-  # The homelab inputs in one PR, with the ones they follow from here: each
-  # homelab main is checked against the locks it has, so one moved alone can
-  # meet an older one it doesn't evaluate against
-  groups:
-    homelab:
-      patterns: ["homelab-*", "setup-secrets", "k8sss", "kube-generators", "docs"]
+  patterns: ["*"]
+  multi-ecosystem-group: upstream
+  ignore:
+  - dependency-name: homelab-*
+  - dependency-name: setup-secrets
+  - dependency-name: k8sss
+  - dependency-name: kube-generators
+  - dependency-name: docs
 - package-ecosystem: github-actions
   directory: /
-  schedule:
-    interval: weekly
+  patterns: ["*"]
+  multi-ecosystem-group: upstream
