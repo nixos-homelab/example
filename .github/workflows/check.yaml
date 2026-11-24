@@ -20,9 +20,12 @@ jobs:
     # The full suite took up to about 50 minutes on a public runner; past this the runner is stuck, not slow
     timeout-minutes: 60
     steps:
-    # The VM closure and its images take more than the runner has free
+    # The VM closure and its images take more than the runner has free. In the background: it takes about 2 minutes,
+    # and the evaluation needs none of that space
     - name: Free disk space
-      run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache /usr/local/share/boost
+      run: |
+        sudo systemd-run --unit=free-disk-space rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+          /opt/hostedtoolcache /usr/local/share/boost
     # The mode systemd gives /dev/kvm upstream. A group won't do: Nix drops the supplementary groups of sandboxed
     # builds
     - name: Enable KVM
@@ -64,6 +67,7 @@ jobs:
         cat checks.txt
     - name: Build the checks
       run: |
+        while systemctl is-active -q free-disk-space; do sleep 5; done
         (while sleep 60; do echo "memory: $(free -m | awk '/^Mem:/ {print "used " $3 " MiB, available " $7 " MiB"}')"; done) &
         xargs nix build -L --no-link < checks.txt
     # Everything not from cache.nixos.org, without the upstream image archives (fetched again from their registries)
