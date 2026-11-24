@@ -15,10 +15,14 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  check:
+  # Everything the checks need, and the checks but the VM tests; then the VM tests in a job of their own, each within its
+  # own hour. A nixpkgs bump rebuilds about 35 minutes of it on a public runner, and the NAS suite takes 20 to 25 more
+  build:
     runs-on: ubuntu-latest
-    # The full suite took up to about 50 minutes on a public runner; past this the runner is stuck, not slow
     timeout-minutes: 60
+    outputs:
+      tests-passed: ${{ steps.passed.outputs.cache-hit }}
+      tests-key: ${{ steps.tests.outputs.key }}
     steps:
     # The VM closure and its images take more than the runner has free. In the background: it takes about 2 minutes,
     # and the evaluation needs none of that space
@@ -27,7 +31,7 @@ jobs:
         sudo systemd-run --unit=free-disk-space rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
           /opt/hostedtoolcache /usr/local/share/boost
     # The mode systemd gives /dev/kvm upstream. A group won't do: Nix drops the supplementary groups of sandboxed
-    # builds
+    # builds. The disk image is built in a VM too
     - name: Enable KVM
       run: |
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
@@ -56,20 +60,70 @@ jobs:
     # nix flake check keeps its evaluator, about 8 GiB here, while it builds, and with the VMs beside it a public runner
     # (16 GB) ran out of memory and the job was cancelled. So one evaluation, which builds what it imports (the Helm
     # charts) and evaluates the packages too, writes the checks' derivations and exits, and the build evaluates nothing.
-    # The memory, once a minute, shows how close it gets
+    # A VM test is a check with a driver
     - name: Evaluate the flake
       run: |
-        nix eval --json .#. --apply 'flake: {
-          checks = map (check: check.drvPath) (builtins.attrValues flake.checks.x86_64-linux);
+        nix eval --json .#. --apply 'flake: let
+          checks = builtins.attrValues flake.checks.x86_64-linux;
+        in {
+          checks = map (check: check.drvPath) checks;
+          tests = map (check: check.drvPath) (builtins.filter (check: check ? driver) checks);
           packages = map (package: package.drvPath) (builtins.attrValues flake.packages.x86_64-linux);
         }' > outputs.json
-        jq -r '.checks[] + "^*"' outputs.json > checks.txt
-        cat checks.txt
+        jq -r '.tests[]' outputs.json | sort > tests.txt
+        cat tests.txt
+        # What the VM tests are built from: the outputs of other derivations they name, and plain store paths
+        xargs nix derivation show < tests.txt |
+          jq -r '(.derivations // .) | .[]
+            | ((.inputs.drvs // .inputDrvs) | to_entries[] | "\(.key)^\((.value.outputs? // .value) | join(","))"),
+              ((.inputs.srcs // .inputSrcs)[])
+            | if startswith("/") then . else "/nix/store/" + . end' > test-inputs.txt
+    - name: Name the VM tests
+      id: tests
+      run: echo "key=vm-tests-${{ hashFiles('tests.txt') }}" >> "$GITHUB_OUTPUT"
+    # A VM test whose derivation passed before passes again; the test job records each pass
+    - name: Look up a pass of the VM tests
+      id: passed
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: /home/runner/vm-tests-passed
+        key: ${{ steps.tests.outputs.key }}
+        lookup-only: true
+    # The checks but the VM tests, and what the VM tests are built from unless they passed before
     - name: Build the checks
+      env:
+        TESTS_PASSED: ${{ steps.passed.outputs.cache-hit }}
       run: |
         while systemctl is-active -q free-disk-space; do sleep 5; done
         (while sleep 60; do echo "memory: $(free -m | awk '/^Mem:/ {print "used " $3 " MiB, available " $7 " MiB"}')"; done) &
-        xargs nix build -L --no-link < checks.txt
+        jq -r '.checks - .tests | .[] + "^*"' outputs.json > build.txt
+        if [[ $TESTS_PASSED != true ]] && [[ -s tests.txt ]]; then
+          grep '\.drv^' test-inputs.txt >> build.txt
+        fi
+        xargs nix build -L --no-link < build.txt
+    # What the test job needs: the VM tests' derivations and the closures of what they are built from, as a binary
+    # cache in a directory, already compressed. Whole closures, as a binary cache takes a path only with its references
+    - name: Export what the VM tests are built from
+      id: export
+      if: ${{ steps.passed.outputs.cache-hit != 'true' }}
+      run: |
+        export=/home/runner/vm-test-inputs
+        xargs nix copy --to "file://$export?compression=zstd" < test-inputs.txt
+        xargs nix copy --derivation --to "file://$export?compression=zstd" < tests.txt
+        sudo cp tests.txt "$export/"
+        du -sh "$export"
+    - name: Upload what the VM tests are built from
+      if: ${{ steps.export.outcome == 'success' }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: vm-test-inputs
+        path: /home/runner/vm-test-inputs
+        compression-level: 0
+        retention-days: 1
+    # Room for the cache
+    - name: Drop the export
+      if: ${{ steps.export.outcome == 'success' }}
+      run: sudo rm -rf /home/runner/vm-test-inputs
     # Everything not from cache.nixos.org, without the upstream image archives (fetched again from their registries)
     # and the disk image of the VM, which would take most of the 10 GB GitHub keeps per repository
     # The Nix daemon, which runs as root, makes the directory when it opens the substituter
@@ -117,3 +171,60 @@ jobs:
       with:
         path: /home/runner/nix-cache
         key: nix-${{ hashFiles('flake.lock') }}-${{ github.sha }}
+
+  # The required check: fails when the build did, runs the VM tests that haven't passed before
+  check:
+    needs: build
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+    - name: Require the build
+      if: ${{ needs.build.result != 'success' }}
+      run: exit 1
+    - name: Free disk space
+      if: ${{ needs.build.outputs.tests-passed != 'true' }}
+      run: |
+        sudo systemd-run --unit=free-disk-space rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+          /opt/hostedtoolcache /usr/local/share/boost
+    # The mode systemd gives /dev/kvm upstream. A group won't do: Nix drops the supplementary groups of sandboxed
+    # builds
+    - name: Enable KVM
+      if: ${{ needs.build.outputs.tests-passed != 'true' }}
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+    - name: Install Nix
+      if: ${{ needs.build.outputs.tests-passed != 'true' }}
+      uses: cachix/install-nix-action@bb0495a1086c46893eee56f32fd192dfe4a15bb9 # v32.0.0
+      with:
+        extra_nix_config: |
+          experimental-features = nix-command flakes
+          system-features = kvm nixos-test benchmark big-parallel
+          extra-substituters = file:///home/runner/vm-test-inputs?trusted=true
+    - name: Wait for the disk space
+      if: ${{ needs.build.outputs.tests-passed != 'true' }}
+      run: while systemctl is-active -q free-disk-space; do sleep 5; done
+    - name: Download what the VM tests are built from
+      if: ${{ needs.build.outputs.tests-passed != 'true' }}
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: vm-test-inputs
+        path: /home/runner/vm-test-inputs
+    - name: Run the VM tests
+      if: ${{ needs.build.outputs.tests-passed != 'true' }}
+      run: |
+        (while sleep 60; do echo "memory: $(free -m | awk '/^Mem:/ {print "used " $3 " MiB, available " $7 " MiB"}')"; done) &
+        tests=/home/runner/vm-test-inputs/tests.txt
+        xargs nix copy --no-check-sigs --derivation --from file:///home/runner/vm-test-inputs < $tests
+        sed 's/$/^*/' $tests | xargs nix build -L --no-link
+    - name: Record the pass
+      if: ${{ needs.build.outputs.tests-passed != 'true' }}
+      run: mkdir -p /home/runner/vm-tests-passed && touch /home/runner/vm-tests-passed/passed
+    - name: Save the pass
+      if: ${{ needs.build.outputs.tests-passed != 'true' }}
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: /home/runner/vm-tests-passed
+        key: ${{ needs.build.outputs.tests-key }}
