@@ -60,14 +60,15 @@ jobs:
     # nix flake check keeps its evaluator, about 8 GiB here, while it builds, and with the VMs beside it a public runner
     # (16 GB) ran out of memory and the job was cancelled. So one evaluation, which builds what it imports (the Helm
     # charts) and evaluates the packages too, writes the checks' derivations and exits, and the build evaluates nothing.
-    # A VM test is a check with a driver
+    # The VM tests aren't among the flake's checks, so a plain flake check stays fast; here "checks" are both
     - name: Evaluate the flake
       run: |
         nix eval --json .#. --apply 'flake: let
-          checks = builtins.attrValues flake.checks.x86_64-linux;
+          tests = builtins.attrValues flake.legacyPackages.x86_64-linux.nixosTests;
+          checks = builtins.attrValues flake.checks.x86_64-linux ++ tests;
         in {
           checks = map (check: check.drvPath) checks;
-          tests = map (check: check.drvPath) (builtins.filter (check: check ? driver) checks);
+          tests = map (test: test.drvPath) tests;
           packages = map (package: package.drvPath) (builtins.attrValues flake.packages.x86_64-linux);
         }' > outputs.json
         jq -r '.tests[]' outputs.json | sort > tests.txt

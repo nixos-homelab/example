@@ -54,9 +54,12 @@ nix run .#nas-installer
 
 `nix flake check` validates the manifests the NAS sends to k3s against the
 Kubernetes and CRD schemas, and that every image comes preloaded from Nix. It
-also boots the prebuilt VM under the NixOS test driver
-(`nix/tests/nas-prebuilt.py`) and checks storage, networking, k3s, the apps
-and a reboot. It needs KVM.
+takes minutes.
+
+`nix build .#nixosTests.nas-prebuilt` boots the prebuilt VM under the NixOS
+test driver (`nix/tests/nas-prebuilt.py`) and checks storage, networking, k3s,
+the apps and a reboot. It needs KVM and takes the better part of an hour when
+the system changed. CI runs both.
 
 To work on the tests, keep the VM running and send it scripts from the
 devshell:

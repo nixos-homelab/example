@@ -117,7 +117,7 @@ main() {
       overrides+=(--override-input "${input%%=*}" "git+file://$(realpath "${input#*=}")")
     done
     system=$(nix eval --raw --impure --expr builtins.currentSystem)
-    check=".#checks.$system.$HOST-prebuilt"
+    check=".#legacyPackages.$system.nixosTests.$HOST-prebuilt"
     driver=$(nix build --no-link --print-out-paths "${overrides[@]}" "$check.driver")
     conf=$(nix build --no-link --print-out-paths "${overrides[@]}" "$check.config.driverConfigurationFile")
     mkdir -p "$dir"

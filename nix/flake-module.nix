@@ -40,7 +40,12 @@ in
       );
     };
     perSystem =
-      { system, pkgs, ... }:
+      {
+        config,
+        system,
+        pkgs,
+        ...
+      }:
       {
         devshells.default.commands = [
           {
@@ -123,8 +128,16 @@ in
           inherit pkgs;
           inherit (configs.nas) config;
         };
-        # The NAS in the prebuilt VM under the NixOS test driver, with a LAN client and one outside it
-        checks.nas-prebuilt = pkgs.testers.runNixOSTest {
+        # The VM tests, under the NixOS test driver (needs KVM): `nix build .#nixosTests.<name>`. They stay out of the
+        # checks, so a plain `nix flake check` takes minutes; CI runs both
+        # That the VM tests evaluate, without building or running them
+        checks.nixos-tests = pkgs.writeText "nixos-tests" (
+          lib.concatMapStringsSep "\n" (test: builtins.unsafeDiscardOutputDependency test.drvPath) (
+            lib.attrValues config.legacyPackages.nixosTests
+          )
+        );
+        # The NAS in the prebuilt VM, with a LAN client and one outside it
+        legacyPackages.nixosTests.nas-prebuilt = pkgs.testers.runNixOSTest {
           name = "nas-prebuilt";
           # The configuration sets nixpkgs.config, so it brings its own pkgs
           node.pkgs = lib.mkForce null;
