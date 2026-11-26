@@ -45,6 +45,8 @@ in
     setup-secrets = {
       sources = lib.genAttrs [ "ZED_PUSHOVER_USER" "ZED_PUSHOVER_TOKEN" ] (name: {
         description = "ZFS Event Daemon ${name}";
+        # Pushover's, typed in on a real machine
+        test = "echo test-${lib.toLower name}";
         cmd = ''
           source "${pushoverCreds}"
           printf "%s" "''$${name}"

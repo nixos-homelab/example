@@ -34,6 +34,9 @@ in
   # driver waits on the dead guest until the job's timeout
   nodes.nas.boot.kernelModules = [ "i6300esb" ];
   nodes.nas.systemd.settings.Manager.RuntimeWatchdogSec = "2min";
+  # The stand-ins of the secrets that someone types in on the NAS: the INWX and Pushover credentials, the IMAP
+  # passwords, the Ghostfolio token, the privacy VPN key
+  nodes.nas.setup-secrets.testing = true;
   # Plex never becomes available in the VM, and the test expects its API key to fail. As configured, each setup-secrets
   # run waits for its rollout 6 times over, about 10 minutes, before it gives up
   nodes.nas.setup-secrets.sources.PLEX_API_KEY = {
@@ -49,7 +52,8 @@ in
       {
         virtualisation.qemu.options = lib.concatLists (
           lib.imap1 (
-            idx: drive: lib.optional (lib.hasInfix "/empty" drive.file) "-set drive.drive${toString idx}.cache=unsafe"
+            idx: drive:
+            lib.optional (lib.hasInfix "/empty" drive.file) "-set drive.drive${toString idx}.cache=unsafe"
           ) config.virtualisation.qemu.drives
         );
       }

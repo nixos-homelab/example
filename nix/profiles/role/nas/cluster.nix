@@ -57,12 +57,14 @@ in
         namespace = "cert-manager";
         name = "inwx-credentials";
         field = "username";
+        test = "echo test-inwx-user";
       };
       sources.INWX_PASSWORD = kubeSecretSource pkgs {
         description = "INWX Password";
         namespace = "cert-manager";
         name = "inwx-credentials";
         field = "password";
+        test = "echo test-inwx-password";
       };
       destinations = [
         (kubeSecretDestination pkgs {
