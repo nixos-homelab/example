@@ -61,6 +61,8 @@ in
           ];
           cmd = ''
             umask 077
+            # Nothing else makes the directory: on a fresh machine this is the first secret in it
+            mkdir -p "${builtins.dirOf pushoverCreds}"
             printf "ZED_PUSHOVER_USER=%q\nZED_PUSHOVER_TOKEN=%q\n" "$ZED_PUSHOVER_USER" "$ZED_PUSHOVER_TOKEN" >"${pushoverCreds}"
           '';
         }
